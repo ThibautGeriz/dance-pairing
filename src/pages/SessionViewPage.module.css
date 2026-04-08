@@ -1,0 +1,140 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.backLink {
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.title {
+  flex: 1;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.shuffleBtn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.main {
+  flex: 1;
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  overflow-y: auto;
+}
+
+.roundTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+}
+
+.pairsList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.pairCard {
+  display: flex;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  gap: var(--spacing-sm);
+}
+
+.pairSide {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.pairSideRight {
+  justify-content: flex-end;
+}
+
+.personInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.personInfoRight {
+  align-items: flex-end;
+}
+
+.leaderName {
+  color: var(--color-leader);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+}
+
+.followerName {
+  color: var(--color-follower);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+}
+
+.pairLevel {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.divider {
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.badge {
+  background: var(--color-badge);
+  color: #000;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.notFound {
+  padding: var(--spacing-lg) var(--spacing-md);
+  color: var(--color-text-muted);
+}
