@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import type { Person } from '../types';
+import { levelOf } from '../utils/roles';
+import type { Person, Role } from '../types';
 import styles from './PersonItem.module.css';
 
 interface PersonItemProps {
   person: Person;
+  /** The column this item is shown in; its level is the person's level in that role */
+  role: Role;
   levels: string[];
   onRemove: () => void;
   onRename: (name: string) => void;
@@ -12,6 +15,7 @@ interface PersonItemProps {
 
 export default function PersonItem({
   person,
+  role,
   levels,
   onRemove,
   onRename,
@@ -31,19 +35,22 @@ export default function PersonItem({
     setEditing(true);
   };
 
+  const level = levelOf(person, role);
+
   const cycleLevel = () => {
-    const currentIdx = levels.indexOf(person.level ?? '');
+    const currentIdx = levels.indexOf(level);
     const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % levels.length;
-    onLevelChange(levels[nextIdx] ?? person.level);
+    onLevelChange(levels[nextIdx] ?? level);
   };
 
-  const displayLevel = person.level || levels[0] || '—';
+  const displayLevel = level || levels[0] || '—';
+  const roleName = role === 'leader' ? 'Leader' : 'Follower';
 
   return (
     <li className={styles.personItem}>
-      {person.roles.map((role) => (
-        <span key={role} className={role === 'leader' ? styles.roleLeader : styles.roleFollower}>
-          {role === 'leader' ? 'L' : 'F'}
+      {person.roles.map(({ role: r }) => (
+        <span key={r} className={r === 'leader' ? styles.roleLeader : styles.roleFollower}>
+          {r === 'leader' ? 'L' : 'F'}
         </span>
       ))}
 
@@ -75,8 +82,8 @@ export default function PersonItem({
       <button
         className={styles.levelBtn}
         onClick={cycleLevel}
-        title="Tap to change level"
-        aria-label={`Level: ${displayLevel}`}
+        title={`Tap to change ${roleName.toLowerCase()} level`}
+        aria-label={`${roleName} level: ${displayLevel}`}
       >
         {displayLevel}
       </button>

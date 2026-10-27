@@ -19,10 +19,11 @@ function renderApp(initialPath = '/') {
 
 const ROOM_ID = 'test-room-1';
 
-// `role` is the legacy single-role shape, still accepted via migration
-type SeedPerson = { id: string; name: string; level: string } & (
-  | { role: string }
-  | { roles: string[] }
+// `role`, and `roles: string[]` with a shared `level`, are legacy shapes still accepted via migration
+type SeedPerson = { id: string; name: string } & (
+  | { role: string; level: string }
+  | { roles: string[]; level: string }
+  | { roles: { role: string; level: string }[] }
 );
 
 function seedRooms(
@@ -201,8 +202,8 @@ describe('Room page', () => {
     expect(screen.getAllByText('L')).toHaveLength(2);
     expect(screen.getAllByText('F')).toHaveLength(2);
     expect(JSON.parse(localStorage.getItem('dance-pairing:rooms')!)[0].people[0].roles).toEqual([
-      'leader',
-      'follower',
+      { role: 'leader', level: 'Newcomer' },
+      { role: 'follower', level: 'Newcomer' },
     ]);
   });
 
@@ -231,7 +232,11 @@ describe('Room page', () => {
     await user.type(screen.getByPlaceholderText(/person's name/i), 'Bob');
     await user.click(screen.getByRole('button', { name: 'Add' }));
     const people = JSON.parse(localStorage.getItem('dance-pairing:rooms')!)[0].people;
-    expect(people[0]).toEqual({ id: 'p1', name: 'Alice', roles: ['follower'], level: 'Novice' });
+    expect(people[0]).toEqual({
+      id: 'p1',
+      name: 'Alice',
+      roles: [{ role: 'follower', level: 'Novice' }],
+    });
     expect(screen.getByText(/leaders \(1\)/i)).toBeInTheDocument();
     expect(screen.getByText(/followers \(1\)/i)).toBeInTheDocument();
   });
@@ -318,6 +323,106 @@ describe('Room page', () => {
       renderApp(`/rooms/${ROOM_ID}`);
       await user.click(screen.getByRole('button', { name: /level: novice/i }));
       expect(screen.getByRole('button', { name: /level: intermediate/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('level per role', () => {
+    beforeEach(() => {
+      localStorage.setItem(
+        'dance-pairing:settings',
+        JSON.stringify({ levels: ['Newcomer', 'Intermediate', 'All-star'] }),
+      );
+    });
+
+    it('only shows a level picker for the selected roles', async () => {
+      const user = userEvent.setup();
+      seedRoom();
+      renderApp(`/rooms/${ROOM_ID}`);
+      expect(screen.getByRole('combobox', { name: 'Leader level' })).toBeInTheDocument();
+      expect(screen.queryByRole('combobox', { name: 'Follower level' })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('checkbox', { name: 'Follower' }));
+      expect(screen.getByRole('combobox', { name: 'Follower level' })).toBeInTheDocument();
+    });
+
+    it('adds a person with a different level in each role', async () => {
+      const user = userEvent.setup();
+      seedRoom();
+      renderApp(`/rooms/${ROOM_ID}`);
+      await user.click(screen.getByRole('checkbox', { name: 'Follower' }));
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Leader level' }), 'All-star');
+      await user.selectOptions(
+        screen.getByRole('combobox', { name: 'Follower level' }),
+        'Intermediate',
+      );
+      await user.type(screen.getByPlaceholderText(/person's name/i), 'Vivien');
+      await user.click(screen.getByRole('button', { name: 'Add' }));
+
+      expect(screen.getByRole('button', { name: 'Leader level: All-star' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Follower level: Intermediate' }),
+      ).toBeInTheDocument();
+      expect(storedRoom().people[0].roles).toEqual([
+        { role: 'leader', level: 'All-star' },
+        { role: 'follower', level: 'Intermediate' },
+      ]);
+    });
+
+    it('changes the level of one role without touching the other', async () => {
+      const user = userEvent.setup();
+      seedRoom([
+        {
+          id: 'v',
+          name: 'Vivien',
+          roles: [
+            { role: 'leader', level: 'All-star' },
+            { role: 'follower', level: 'Intermediate' },
+          ],
+        },
+      ]);
+      renderApp(`/rooms/${ROOM_ID}`);
+      await user.click(screen.getByRole('button', { name: 'Follower level: Intermediate' }));
+      expect(storedRoom().people[0].roles).toEqual([
+        { role: 'leader', level: 'All-star' },
+        { role: 'follower', level: 'All-star' },
+      ]);
+      await user.click(screen.getByRole('button', { name: 'Leader level: All-star' }));
+      expect(storedRoom().people[0].roles).toEqual([
+        { role: 'leader', level: 'Newcomer' },
+        { role: 'follower', level: 'All-star' },
+      ]);
+    });
+
+    it('migrates a dual-role person with one shared level', () => {
+      seedRoom([{ id: 'v', name: 'Vivien', roles: ['leader', 'follower'], level: 'All-star' }]);
+      renderApp(`/rooms/${ROOM_ID}`);
+      expect(screen.getByRole('button', { name: 'Leader level: All-star' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Follower level: All-star' })).toBeInTheDocument();
+    });
+
+    it('shows the level of the role each person dances, on attendance and pairs', async () => {
+      const user = userEvent.setup();
+      seedRoom([
+        {
+          id: 'v',
+          name: 'Vivien',
+          roles: [
+            { role: 'leader', level: 'All-star' },
+            { role: 'follower', level: 'Intermediate' },
+          ],
+        },
+        { id: 'p2', name: 'Bob', roles: [{ role: 'leader', level: 'Newcomer' }] },
+      ]);
+      renderApp(`/rooms/${ROOM_ID}/session`);
+      expect(screen.getByRole('checkbox', { name: 'Vivien All-star' })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Vivien Intermediate' })).toBeInTheDocument();
+
+      // Only Bob can lead Vivien: she follows, at her follower level
+      await user.click(screen.getByRole('button', { name: /generate pairs/i }));
+      const card = screen
+        .getAllByRole('listitem')
+        .find((li) => /Bob.*Vivien/.test(li.textContent ?? ''))!;
+      expect(card).toHaveTextContent('Intermediate');
+      expect(card).not.toHaveTextContent('All-star');
     });
   });
 

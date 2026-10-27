@@ -2,8 +2,14 @@ export type Role = 'leader' | 'follower';
 
 export const ROLES: Role[] = ['leader', 'follower'];
 
-/** One or two unique roles */
-export type Roles = [Role] | [Role, Role];
+/** A role a person dances, with their level in that role (e.g. all-star leader, intermediate follower) */
+export interface RoleLevel {
+  role: Role;
+  level: string;
+}
+
+/** One or two unique roles, each with its own level */
+export type Roles = [RoleLevel] | [RoleLevel, RoleLevel];
 
 declare const personIdBrand: unique symbol;
 
@@ -15,7 +21,6 @@ export interface Person {
   name: string;
   /** A person with both roles may lead or follow, but never dances with themselves */
   roles: Roles;
-  level: string;
 }
 
 export interface Pair {

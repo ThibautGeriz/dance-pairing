@@ -1,8 +1,8 @@
 import { useLocalStorage } from './useLocalStorage';
 import { isSamePair } from '../utils/forbidden';
-import { toRoles } from '../utils/roles';
+import { toRoles, withRoleLevel } from '../utils/roles';
 import { normalizeRooms } from '../utils/storage';
-import type { Room, Person, PersonId, Roles, Session, Pair } from '../types';
+import type { Room, Person, PersonId, Role, Roles, Session, Pair } from '../types';
 
 const STORAGE_KEY = 'dance-pairing:rooms';
 
@@ -39,12 +39,11 @@ export function useRooms() {
     setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, name: name.trim() } : r)));
   };
 
-  const addPerson = (roomId: string, name: string, roles: Roles, level: string) => {
+  const addPerson = (roomId: string, name: string, roles: Roles) => {
     const person: Person = {
       id: generatePersonId(),
       name: name.trim(),
       roles: toRoles(roles) ?? roles,
-      level,
     };
     setRooms((prev) =>
       prev.map((r) => (r.id === roomId ? { ...r, people: [...r.people, person] } : r)),
@@ -78,11 +77,16 @@ export function useRooms() {
     );
   };
 
-  const changePersonLevel = (roomId: string, personId: PersonId, level: string) => {
+  const changePersonLevel = (roomId: string, personId: PersonId, role: Role, level: string) => {
     setRooms((prev) =>
       prev.map((r) =>
         r.id === roomId
-          ? { ...r, people: r.people.map((p) => (p.id === personId ? { ...p, level } : p)) }
+          ? {
+              ...r,
+              people: r.people.map((p) =>
+                p.id === personId ? { ...p, roles: withRoleLevel(p.roles, role, level) } : p,
+              ),
+            }
           : r,
       ),
     );

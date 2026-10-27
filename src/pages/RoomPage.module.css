@@ -108,6 +108,11 @@
   border: 0;
 }
 
+.roleWithLevel {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
 .roleToggle {
   display: flex;
   align-items: center;

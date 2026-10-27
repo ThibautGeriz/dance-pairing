@@ -7,20 +7,20 @@ const pid = (id: string) => id as PersonId;
 const leader = (id: string, level = 'Newcomer'): Person => ({
   id: pid(id),
   name: `Leader ${id}`,
-  roles: ['leader'],
-  level,
+  roles: [{ role: 'leader', level }],
 });
 const follower = (id: string, level = 'Newcomer'): Person => ({
   id: pid(id),
   name: `Follower ${id}`,
-  roles: ['follower'],
-  level,
+  roles: [{ role: 'follower', level }],
 });
-const both = (id: string, level = 'Newcomer'): Person => ({
+const both = (id: string, level = 'Newcomer', followerLevel = level): Person => ({
   id: pid(id),
   name: `Both ${id}`,
-  roles: ['leader', 'follower'],
-  level,
+  roles: [
+    { role: 'leader', level },
+    { role: 'follower', level: followerLevel },
+  ],
 });
 
 const hasSelfPair = (pairs: Pair[]) => pairs.some((p) => p.leader.id === p.follower.id);
@@ -431,6 +431,37 @@ describe('generateOpenRounds (roles ignored)', () => {
       const [first, second] = generateOpenRounds(people, 2, false, []);
       const seen = new Set(partners(first));
       expect(partners(second).filter((k) => seen.has(k))).toEqual([]);
+    }
+  });
+});
+
+describe('level per role', () => {
+  it("matches on a dual-role dancer's follower level when they follow", () => {
+    const levels = ['Newcomer', 'Advanced'];
+    // Vivien leads at Newcomer but follows at Advanced
+    const vivien = both('v', 'Newcomer', 'Advanced');
+    for (let i = 0; i < 20; i++) {
+      const pairs = generatePairsByLevel(
+        [leader('a', 'Advanced'), leader('b', 'Newcomer')],
+        [vivien, follower('y', 'Newcomer')],
+        levels,
+      );
+      const keys = pairs.map((p) => `${p.leader.id}-${p.follower.id}`).sort();
+      expect(keys).toEqual(['a-v', 'b-y']);
+    }
+  });
+
+  it("matches on a dual-role dancer's leader level when they lead", () => {
+    const levels = ['Newcomer', 'Advanced'];
+    const vivien = both('v', 'Advanced', 'Newcomer');
+    for (let i = 0; i < 20; i++) {
+      const pairs = generatePairsByLevel(
+        [vivien, leader('b', 'Newcomer')],
+        [follower('x', 'Advanced'), follower('y', 'Newcomer')],
+        levels,
+      );
+      const keys = pairs.map((p) => `${p.leader.id}-${p.follower.id}`).sort();
+      expect(keys).toEqual(['b-y', 'v-x']);
     }
   });
 });
