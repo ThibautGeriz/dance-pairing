@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { generatePairs, generatePairsByLevel, generateRounds } from './pairing';
+import { generateOpenRounds, generatePairs, generatePairsByLevel, generateRounds } from './pairing';
 import type { Pair, Person, PersonId } from '../types';
 
 const pid = (id: string) => id as PersonId;
@@ -359,6 +359,78 @@ describe('forbidden pairs', () => {
         expect(keys).not.toContain('a-x');
         expect(keys).not.toContain('b-y');
       });
+    }
+  });
+});
+
+describe('generateOpenRounds (roles ignored)', () => {
+  const partners = (pairs: Pair[]) =>
+    pairs.map((p) => [p.leader.id, p.follower.id].sort().join('-')).sort();
+
+  it('returns empty rounds with fewer than two people', () => {
+    expect(generateOpenRounds([], 1, false, [])).toEqual([[]]);
+    expect(generateOpenRounds([leader('a')], 1, false, [])).toEqual([[]]);
+  });
+
+  it('pairs people regardless of their roles', () => {
+    const [round] = generateOpenRounds([leader('a'), leader('b')], 1, false, []);
+    expect(partners(round)).toEqual(['a-b']);
+  });
+
+  it('pairs everyone exactly once with an even count, never with themselves', () => {
+    const people = [leader('a'), leader('b'), follower('x'), both('y')];
+    for (let i = 0; i < 20; i++) {
+      const [round] = generateOpenRounds(people, 1, false, []);
+      expect(round).toHaveLength(2);
+      expect(hasSelfPair(round)).toBe(false);
+      const ids = round.flatMap((p) => [p.leader.id, p.follower.id]).sort();
+      expect(ids).toEqual(['a', 'b', 'x', 'y']);
+    }
+  });
+
+  it('makes one person dance twice with an odd count', () => {
+    const people = [leader('a'), leader('b'), leader('c')];
+    const [round] = generateOpenRounds(people, 1, false, []);
+    expect(round).toHaveLength(2);
+    expect(hasSelfPair(round)).toBe(false);
+    const ids = new Set(round.flatMap((p) => [p.leader.id, p.follower.id]));
+    expect(ids).toEqual(new Set(['a', 'b', 'c']));
+  });
+
+  it('never generates a forbidden pair', () => {
+    const people = [leader('a'), leader('b'), leader('c'), leader('d')];
+    const forbidden: [PersonId, PersonId][] = [
+      [pid('a'), pid('b')],
+      [pid('c'), pid('d')],
+    ];
+    for (let i = 0; i < 20; i++) {
+      const [round] = generateOpenRounds(people, 1, false, [], forbidden);
+      expect(round).toHaveLength(2);
+      expect(partners(round)).not.toContain('a-b');
+      expect(partners(round)).not.toContain('c-d');
+    }
+  });
+
+  it('matches by level when requested', () => {
+    const levels = ['Newcomer', 'Advanced'];
+    const people = [
+      leader('a', 'Advanced'),
+      follower('b', 'Advanced'),
+      leader('c', 'Newcomer'),
+      follower('d', 'Newcomer'),
+    ];
+    for (let i = 0; i < 20; i++) {
+      const [round] = generateOpenRounds(people, 1, true, levels);
+      expect(partners(round)).toEqual(['a-b', 'c-d']);
+    }
+  });
+
+  it('avoids repeating partners across rounds', () => {
+    const people = [leader('a'), leader('b'), leader('c'), leader('d')];
+    for (let i = 0; i < 20; i++) {
+      const [first, second] = generateOpenRounds(people, 2, false, []);
+      const seen = new Set(partners(first));
+      expect(partners(second).filter((k) => seen.has(k))).toEqual([]);
     }
   });
 });

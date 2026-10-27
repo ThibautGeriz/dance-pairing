@@ -90,10 +90,11 @@ src/
 
 - Lives in `src/utils/pairing.ts`
 - Must be pure functions; no side effects
-- Three exported functions (each takes an optional trailing `forbidden: ForbiddenPair[]`):
+- Four exported functions (each takes an optional trailing `forbidden: ForbiddenPair[]`):
   - `generatePairs(leaders, followers, forbidden?)` — single random round, no history
   - `generatePairsByLevel(leaders, followers, levels, forbidden?)` — single round, matched by skill level proximity
   - `generateRounds(leaders, followers, iterations, pairByLevel, levels, forbidden?)` — multiple rounds with cross-round history tracking to avoid repeats
+  - `generateOpenRounds(people, iterations, pairByLevel, levels, forbidden?)` — "Ignore roles" session option: anyone can dance with anyone; splits the pool into two random halves and reuses the role-based round logic (stored as `Session.ignoreRoles`)
 - If leaders > followers (or vice versa): the shorter side cycles so everyone dances
 - Forbidden pairs (`Room.forbiddenPairs`, "Never pair together" on RoomPage) are never generated; an invalid pair is fixed by swapping followers with another pair, or dropped if no swap works
 - A person has one or two roles (`roles: [Role] | [Role, Role]`); with both they sit in both pools and are never paired with themselves (identity is by `id`)

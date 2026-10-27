@@ -516,6 +516,56 @@ describe('Never pair together', () => {
   });
 });
 
+describe('Switch (no roles)', () => {
+  const leadersOnly: SeedPerson[] = [
+    { id: 'p1', name: 'Alice', roles: ['leader'], level: 'Novice' },
+    { id: 'p2', name: 'Carol', roles: ['leader'], level: 'Novice' },
+    { id: 'p3', name: 'Eve', roles: ['leader'], level: 'Novice' },
+  ];
+
+  it('lets people with the same role dance together', async () => {
+    const user = userEvent.setup();
+    seedRoom(leadersOnly.slice(0, 2));
+    renderApp(`/rooms/${ROOM_ID}/session`);
+    const generate = screen.getByRole('button', { name: /generate pairs/i });
+    expect(generate).toBeDisabled();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Switch (no roles)' }));
+    expect(screen.getByText(/2 dancers/)).toBeInTheDocument();
+    expect(generate).toBeEnabled();
+    await user.click(generate);
+
+    const [card] = screen.getAllByRole('listitem');
+    expect(card).toHaveTextContent(/Alice.*Carol|Carol.*Alice/);
+    expect(storedRoom().sessions[0].ignoreRoles).toBe(true);
+  });
+
+  it('keeps ignoring roles when reshuffling, counting dances across both sides', async () => {
+    const user = userEvent.setup();
+    seedRoom(leadersOnly);
+    renderApp(`/rooms/${ROOM_ID}/session`);
+    await user.click(screen.getByRole('checkbox', { name: 'Switch (no roles)' }));
+    await user.click(screen.getByRole('button', { name: /generate pairs/i }));
+    for (let i = 0; i < 3; i++) {
+      expect(screen.getAllByRole('listitem')).toHaveLength(2);
+      // Three dancers: one of them dances twice
+      expect(screen.getByText('×2')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /shuffle/i }));
+    }
+  });
+
+  it('warns when no two present dancers can dance together', async () => {
+    const user = userEvent.setup();
+    seedRoom(leadersOnly.slice(0, 2), [], [['p1', 'p2']]);
+    renderApp(`/rooms/${ROOM_ID}/session`);
+    await user.click(screen.getByRole('checkbox', { name: 'Switch (no roles)' }));
+    expect(screen.getByRole('button', { name: /generate pairs/i })).toBeDisabled();
+    expect(
+      screen.getByText(/need at least two dancers who can dance together/i),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('Session page', () => {
   it('shows not-found for unknown room id', () => {
     renderApp('/rooms/nonexistent/session');
@@ -543,7 +593,7 @@ describe('Session page', () => {
       renderApp(`/rooms/${ROOM_ID}/session`);
       const peopleCbs = screen
         .getAllByRole('checkbox')
-        .filter((el) => !el.closest('label')?.textContent?.includes('Match'));
+        .filter((el) => !/Match|Switch/.test(el.closest('label')?.textContent ?? ''));
       peopleCbs.forEach((cb) => expect(cb).toBeChecked());
     });
 
