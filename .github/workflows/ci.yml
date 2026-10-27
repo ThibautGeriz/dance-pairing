@@ -31,11 +31,3 @@ jobs:
       - run: npm ci
 
       - run: npm run ${{ matrix.script }}
-
-  # Single required status check for branch protection on main
-  check:
-    needs: checks
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - run: test "${{ needs.checks.result }}" = success
