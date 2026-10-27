@@ -4,7 +4,7 @@ import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
 import { generateRounds } from '../utils/pairing';
 import { canLead, canFollow, hasValidPair } from '../utils/roles';
-import type { Person } from '../types';
+import type { Person, PersonId } from '../types';
 import styles from './SessionPage.module.css';
 
 export default function SessionPage() {
@@ -15,7 +15,7 @@ export default function SessionPage() {
 
   const room = roomId ? getRoom(roomId) : undefined;
 
-  const [presentIds, setPresentIds] = useState<Set<string>>(
+  const [presentIds, setPresentIds] = useState<Set<PersonId>>(
     () => new Set(room?.people.map((p) => p.id) ?? []),
   );
   const [pairByLevel, setPairByLevel] = useState(false);
@@ -35,7 +35,7 @@ export default function SessionPage() {
   const presentPeople = room.people.filter((p) => presentIds.has(p.id));
   const presentLeaders = presentPeople.filter(canLead);
   const presentFollowers = presentPeople.filter(canFollow);
-  const canGenerate = hasValidPair(presentLeaders, presentFollowers);
+  const canGenerate = hasValidPair(presentLeaders, presentFollowers, room.forbiddenPairs);
 
   const togglePerson = (person: Person) => {
     setPresentIds((prev) => {
@@ -53,6 +53,7 @@ export default function SessionPage() {
       iterations,
       pairByLevel,
       settings.levels,
+      room.forbiddenPairs,
     );
     const sessionId = addSession(roomId!, rounds, pairByLevel);
     navigate(`/rooms/${roomId}/sessions/${sessionId}`);
@@ -138,7 +139,7 @@ export default function SessionPage() {
 
         {!canGenerate && presentPeople.length > 0 && (
           <p className={styles.warning}>
-            Need at least one leader and one follower who are different people.
+            Need at least one leader and one follower who can dance together.
           </p>
         )}
       </main>

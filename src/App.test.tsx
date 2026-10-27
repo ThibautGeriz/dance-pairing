@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
@@ -31,13 +31,22 @@ function seedRooms(
     name: string;
     people: SeedPerson[];
     sessions?: unknown[];
+    forbiddenPairs?: [string, string][];
   }[],
 ) {
   localStorage.setItem('dance-pairing:rooms', JSON.stringify(rooms));
 }
 
-function seedRoom(people: SeedPerson[] = [], sessions: unknown[] = []) {
-  seedRooms([{ id: ROOM_ID, name: 'Salsa', people, sessions }]);
+function seedRoom(
+  people: SeedPerson[] = [],
+  sessions: unknown[] = [],
+  forbiddenPairs: [string, string][] = [],
+) {
+  seedRooms([{ id: ROOM_ID, name: 'Salsa', people, sessions, forbiddenPairs }]);
+}
+
+function storedRoom() {
+  return JSON.parse(localStorage.getItem('dance-pairing:rooms')!)[0];
 }
 
 beforeEach(() => {
@@ -170,14 +179,14 @@ describe('Room page', () => {
 
     await user.type(screen.getByPlaceholderText(/person's name/i), 'Alice');
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('Alice', { selector: 'li span' })).toBeInTheDocument();
     expect(screen.getByText(/leaders \(1\)/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: 'Follower' }));
     await user.click(screen.getByRole('checkbox', { name: 'Leader' }));
     await user.type(screen.getByPlaceholderText(/person's name/i), 'Bob');
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    expect(screen.getByText('Bob')).toBeInTheDocument();
+    expect(screen.getByText('Bob', { selector: 'li span' })).toBeInTheDocument();
     expect(screen.getByText(/followers \(1\)/i)).toBeInTheDocument();
   });
 
@@ -392,6 +401,120 @@ describe('Room page', () => {
 });
 
 // ─── Session page ─────────────────────────────────────────────────────────────
+
+describe('Never pair together', () => {
+  const people: SeedPerson[] = [
+    { id: 'p1', name: 'Alice', roles: ['leader'], level: 'Novice' },
+    { id: 'p2', name: 'Bob', roles: ['follower'], level: 'Novice' },
+    { id: 'p3', name: 'Carol', roles: ['leader'], level: 'Novice' },
+    { id: 'p4', name: 'Dan', roles: ['follower'], level: 'Novice' },
+  ];
+
+  it('is hidden when the room has fewer than two people', () => {
+    seedRoom([people[0]]);
+    renderApp(`/rooms/${ROOM_ID}`);
+    expect(screen.queryByText('Never pair together')).not.toBeInTheDocument();
+  });
+
+  it('forbids a pair and lists it', async () => {
+    const user = userEvent.setup();
+    seedRoom(people);
+    renderApp(`/rooms/${ROOM_ID}`);
+    const forbid = screen.getByRole('button', { name: 'Forbid' });
+    expect(forbid).toBeDisabled();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Dancer' }), 'Alice');
+    expect(forbid).toBeDisabled();
+    // A dancer cannot be forbidden with themselves
+    expect(
+      within(screen.getByRole('combobox', { name: 'Never with' })).queryByText('Alice'),
+    ).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Never with' }), 'Bob');
+    await user.click(forbid);
+
+    expect(screen.getByText(/never with/i, { selector: 'li span span' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Allow Alice and Bob to dance together' }),
+    ).toBeInTheDocument();
+    expect(storedRoom().forbiddenPairs).toEqual([['p1', 'p2']]);
+  });
+
+  it('clears the second dancer when the first is changed to the same person', async () => {
+    const user = userEvent.setup();
+    seedRoom(people);
+    renderApp(`/rooms/${ROOM_ID}`);
+    const first = screen.getByRole('combobox', { name: 'Dancer' });
+    const second = screen.getByRole('combobox', { name: 'Never with' });
+    await user.selectOptions(second, 'Bob');
+    await user.selectOptions(first, 'Bob');
+    expect(second).toHaveValue('');
+    await user.selectOptions(first, '');
+    expect(first).toHaveValue('');
+  });
+
+  it('does not allow the same pair twice, in either order', async () => {
+    const user = userEvent.setup();
+    seedRoom(people, [], [['p1', 'p2']]);
+    renderApp(`/rooms/${ROOM_ID}`);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Dancer' }), 'Bob');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Never with' }), 'Alice');
+    expect(screen.getByRole('button', { name: 'Forbid' })).toBeDisabled();
+  });
+
+  it('removes a forbidden pair', async () => {
+    const user = userEvent.setup();
+    seedRoom(people, [], [['p1', 'p2']]);
+    renderApp(`/rooms/${ROOM_ID}`);
+    await user.click(screen.getByRole('button', { name: 'Allow Alice and Bob to dance together' }));
+    expect(screen.queryByRole('button', { name: /allow alice and bob/i })).not.toBeInTheDocument();
+    expect(storedRoom().forbiddenPairs).toEqual([]);
+  });
+
+  it('drops forbidden pairs of a removed person', async () => {
+    const user = userEvent.setup();
+    seedRoom(
+      people,
+      [],
+      [
+        ['p1', 'p2'],
+        ['p3', 'p4'],
+      ],
+    );
+    renderApp(`/rooms/${ROOM_ID}`);
+    await user.click(screen.getAllByRole('button', { name: /remove person/i })[0]); // Alice
+    expect(storedRoom().forbiddenPairs).toEqual([['p3', 'p4']]);
+  });
+
+  it('disables generate when every possible pair is forbidden', () => {
+    seedRoom(people.slice(0, 2), [], [['p1', 'p2']]);
+    renderApp(`/rooms/${ROOM_ID}/session`);
+    expect(screen.getByRole('button', { name: /generate pairs/i })).toBeDisabled();
+    expect(
+      screen.getByText(/need at least one leader and one follower who can dance together/i),
+    ).toBeInTheDocument();
+  });
+
+  it('never generates a forbidden pair, including on reshuffle', async () => {
+    const user = userEvent.setup();
+    seedRoom(
+      people,
+      [],
+      [
+        ['p1', 'p2'],
+        ['p4', 'p3'],
+      ],
+    );
+    renderApp(`/rooms/${ROOM_ID}/session`);
+    await user.click(screen.getByRole('button', { name: /generate pairs/i }));
+    for (let i = 0; i < 5; i++) {
+      const cards = screen.getAllByRole('listitem').map((li) => li.textContent);
+      expect(cards).toHaveLength(2);
+      expect(cards.some((t) => /Alice.*Dan/.test(t ?? ''))).toBe(true);
+      expect(cards.some((t) => /Carol.*Bob/.test(t ?? ''))).toBe(true);
+      await user.click(screen.getByRole('button', { name: /shuffle/i }));
+    }
+  });
+});
 
 describe('Session page', () => {
   it('shows not-found for unknown room id', () => {

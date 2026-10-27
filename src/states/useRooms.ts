@@ -1,11 +1,17 @@
 import { useLocalStorage } from './useLocalStorage';
-import { normalizeRooms, toRoles } from '../utils/roles';
-import type { Room, Person, Roles, Session, Pair } from '../types';
+import { isSamePair } from '../utils/forbidden';
+import { toRoles } from '../utils/roles';
+import { normalizeRooms } from '../utils/storage';
+import type { Room, Person, PersonId, Roles, Session, Pair } from '../types';
 
 const STORAGE_KEY = 'dance-pairing:rooms';
 
 function generateId(): string {
   return crypto.randomUUID();
+}
+
+function generatePersonId(): PersonId {
+  return crypto.randomUUID() as PersonId;
 }
 
 export function useRooms() {
@@ -15,7 +21,13 @@ export function useRooms() {
     setStoredRooms((prev) => update(normalizeRooms(prev)));
 
   const addRoom = (name: string) => {
-    const newRoom: Room = { id: generateId(), name: name.trim(), people: [], sessions: [] };
+    const newRoom: Room = {
+      id: generateId(),
+      name: name.trim(),
+      people: [],
+      sessions: [],
+      forbiddenPairs: [],
+    };
     setRooms((prev) => [...prev, newRoom]);
   };
 
@@ -29,7 +41,7 @@ export function useRooms() {
 
   const addPerson = (roomId: string, name: string, roles: Roles, level: string) => {
     const person: Person = {
-      id: generateId(),
+      id: generatePersonId(),
       name: name.trim(),
       roles: toRoles(roles) ?? roles,
       level,
@@ -39,15 +51,21 @@ export function useRooms() {
     );
   };
 
-  const removePerson = (roomId: string, personId: string) => {
+  const removePerson = (roomId: string, personId: PersonId) => {
     setRooms((prev) =>
       prev.map((r) =>
-        r.id === roomId ? { ...r, people: r.people.filter((p) => p.id !== personId) } : r,
+        r.id === roomId
+          ? {
+              ...r,
+              people: r.people.filter((p) => p.id !== personId),
+              forbiddenPairs: r.forbiddenPairs.filter((pair) => !pair.includes(personId)),
+            }
+          : r,
       ),
     );
   };
 
-  const renamePerson = (roomId: string, personId: string, name: string) => {
+  const renamePerson = (roomId: string, personId: PersonId, name: string) => {
     setRooms((prev) =>
       prev.map((r) =>
         r.id === roomId
@@ -60,7 +78,7 @@ export function useRooms() {
     );
   };
 
-  const changePersonLevel = (roomId: string, personId: string, level: string) => {
+  const changePersonLevel = (roomId: string, personId: PersonId, level: string) => {
     setRooms((prev) =>
       prev.map((r) =>
         r.id === roomId
@@ -70,11 +88,32 @@ export function useRooms() {
     );
   };
 
+  const addForbiddenPair = (roomId: string, a: PersonId, b: PersonId) => {
+    if (a === b) return;
+    setRooms((prev) =>
+      prev.map((r) =>
+        r.id === roomId && !r.forbiddenPairs.some((pair) => isSamePair(pair, a, b))
+          ? { ...r, forbiddenPairs: [...r.forbiddenPairs, [a, b]] }
+          : r,
+      ),
+    );
+  };
+
+  const removeForbiddenPair = (roomId: string, a: PersonId, b: PersonId) => {
+    setRooms((prev) =>
+      prev.map((r) =>
+        r.id === roomId
+          ? { ...r, forbiddenPairs: r.forbiddenPairs.filter((pair) => !isSamePair(pair, a, b)) }
+          : r,
+      ),
+    );
+  };
+
   const addSession = (roomId: string, rounds: Pair[][], pairByLevel: boolean): string => {
     const id = generateId();
     const session: Session = { id, createdAt: Date.now(), rounds, pairByLevel };
     setRooms((prev) =>
-      prev.map((r) => (r.id === roomId ? { ...r, sessions: [...(r.sessions ?? []), session] } : r)),
+      prev.map((r) => (r.id === roomId ? { ...r, sessions: [...r.sessions, session] } : r)),
     );
     return id;
   };
@@ -93,9 +132,7 @@ export function useRooms() {
   };
 
   const getRoom = (roomId: string): Room | undefined => {
-    const room = rooms.find((r) => r.id === roomId);
-    if (!room) return undefined;
-    return { ...room, sessions: room.sessions ?? [] };
+    return rooms.find((r) => r.id === roomId);
   };
 
   return {
@@ -107,6 +144,8 @@ export function useRooms() {
     removePerson,
     renamePerson,
     changePersonLevel,
+    addForbiddenPair,
+    removeForbiddenPair,
     addSession,
     updateSessionRounds,
     getRoom,

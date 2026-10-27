@@ -1,4 +1,9 @@
-import type { Person, Pair } from '../types';
+import { makeCanPair } from './forbidden';
+import type { CanPair } from './forbidden';
+import type { ForbiddenPair, Person, PersonId, Pair } from '../types';
+
+/** Partners each person has already danced with */
+type History = Map<PersonId, Set<PersonId>>;
 
 function fisherYates<T>(array: T[]): T[] {
   const arr = [...array];
@@ -9,32 +14,43 @@ function fisherYates<T>(array: T[]): T[] {
   return arr;
 }
 
-function hasDanced(history: Map<string, Set<string>>, a: Person, b: Person): boolean {
+function hasDanced(history: History, a: Person, b: Person): boolean {
   return history.get(a.id)?.has(b.id) ?? false;
 }
 
-function recordPair(history: Map<string, Set<string>>, a: Person, b: Person): void {
+function recordPair(history: History, a: Person, b: Person): void {
   if (!history.has(a.id)) history.set(a.id, new Set());
   history.get(a.id)!.add(b.id);
 }
 
 /**
- * A person with both roles sits in both pools and must never dance with themselves.
- * Swap followers with another pair to break each self-pair; drop it if no swap works.
+ * Fix pairs that are not allowed (a dual-role dancer with themselves, or a forbidden pair).
+ * Swap followers with another pair when both resulting pairs are allowed; drop it otherwise.
  */
-function removeSelfPairs(pairs: Pair[]): Pair[] {
+function removeInvalidPairs(pairs: Pair[], canPair: CanPair): Pair[] {
   const result = [...pairs];
   for (let i = 0; i < result.length; i++) {
-    const self = result[i];
-    if (self.leader.id !== self.follower.id) continue;
+    const invalid = result[i];
+    if (canPair(invalid.leader, invalid.follower)) continue;
     const j = result.findIndex(
-      (p, k) => k !== i && p.leader.id !== self.leader.id && p.follower.id !== self.leader.id,
+      (p, k) =>
+        k !== i && canPair(invalid.leader, p.follower) && canPair(p.leader, invalid.follower),
     );
     if (j === -1) continue;
-    result[i] = { leader: self.leader, follower: result[j].follower };
-    result[j] = { leader: result[j].leader, follower: self.follower };
+    result[i] = { leader: invalid.leader, follower: result[j].follower };
+    result[j] = { leader: result[j].leader, follower: invalid.follower };
   }
-  return result.filter((p) => p.leader.id !== p.follower.id);
+  return result.filter((p) => canPair(p.leader, p.follower));
+}
+
+/** Dancers who don't dance at all in this round, in the role they were offered. */
+function countSittingOut(pairs: Pair[], leaders: Person[], followers: Person[]): number {
+  const led = new Set(pairs.map((p) => p.leader.id));
+  const followed = new Set(pairs.map((p) => p.follower.id));
+  return (
+    leaders.filter((l) => !led.has(l.id)).length +
+    followers.filter((f) => !followed.has(f.id)).length
+  );
 }
 
 function getLevelIdx(person: Person, levels: string[]): number {
@@ -50,7 +66,8 @@ function generateNPairs(
   leaders: Person[],
   followers: Person[],
   n: number,
-  history: Map<string, Set<string>>,
+  history: History,
+  canPair: CanPair,
 ): Pair[] {
   if (leaders.length === 0 || followers.length === 0 || n === 0) return [];
   let bestPairs: Pair[] = [];
@@ -65,12 +82,13 @@ function generateNPairs(
       candidate.push({ leader: sl[i % sl.length], follower: sf[i % sf.length] });
     }
 
-    const pairs = removeSelfPairs(candidate);
+    const pairs = removeInvalidPairs(candidate, canPair);
     const repeats = pairs.filter(({ leader, follower }) =>
       hasDanced(history, leader, follower),
     ).length;
-    // A dropped pair is worse than any number of repeats
-    const score = repeats + (n - pairs.length) * (n + 1);
+    // A dropped pair or a dancer sitting out is worse than any number of repeats
+    const missed = n - pairs.length + countSittingOut(pairs, leaders, followers);
+    const score = repeats + missed * (n + 1);
 
     if (score < bestScore) {
       bestScore = score;
@@ -89,16 +107,14 @@ function generateNPairs(
 function generateRoundAvoidingRepeats(
   leaders: Person[],
   followers: Person[],
-  history: Map<string, Set<string>>,
+  history: History,
+  canPair: CanPair,
 ): Pair[] {
-  return generateNPairs(leaders, followers, Math.max(leaders.length, followers.length), history);
+  const n = Math.max(leaders.length, followers.length);
+  return generateNPairs(leaders, followers, n, history, canPair);
 }
 
-function scoreLevelRound(
-  pairs: Pair[],
-  levels: string[],
-  history: Map<string, Set<string>>,
-): number {
+function scoreLevelRound(pairs: Pair[], levels: string[], history: History): number {
   return pairs.reduce((total, { leader, follower }) => {
     const dist = Math.abs(getLevelIdx(leader, levels) - getLevelIdx(follower, levels));
     const repeat = hasDanced(history, leader, follower) ? 100 : 0;
@@ -110,7 +126,8 @@ function oneLevelRoundAttempt(
   leaders: Person[],
   followers: Person[],
   levels: string[],
-  history: Map<string, Set<string>>,
+  history: History,
+  canPair: CanPair,
   startOffset: number,
 ): Pair[] {
   const n = Math.max(leaders.length, followers.length);
@@ -122,15 +139,14 @@ function oneLevelRoundAttempt(
   const sf = fisherYates(followers);
 
   // Track how many times each follower has been picked this round
-  const usage = new Map<string, number>(sf.map((f) => [f.id, 0]));
+  const usage = new Map<PersonId, number>(sf.map((f) => [f.id, 0]));
 
   const pairs: Pair[] = [];
 
   for (let i = 0; i < n; i++) {
     const leader = sl[(i + startOffset) % sl.length];
     const leaderLevelIdx = getLevelIdx(leader, levels);
-    // A person with both roles cannot dance with themselves
-    const candidates = sf.filter((f) => f.id !== leader.id);
+    const candidates = sf.filter((f) => canPair(leader, f));
     if (candidates.length === 0) continue;
 
     // Pick the best available follower:
@@ -168,7 +184,8 @@ function generateRoundByLevelAvoidingRepeats(
   leaders: Person[],
   followers: Person[],
   levels: string[],
-  history: Map<string, Set<string>>,
+  history: History,
+  canPair: CanPair,
 ): Pair[] {
   if (leaders.length === 0 || followers.length === 0) return [];
 
@@ -178,9 +195,11 @@ function generateRoundByLevelAvoidingRepeats(
   for (let attempt = 0; attempt < 20; attempt++) {
     // Vary which leader gets the extra dance across attempts
     const startOffset = attempt === 0 ? 0 : Math.floor(Math.random() * leaders.length);
-    const pairs = oneLevelRoundAttempt(leaders, followers, levels, history, startOffset);
+    const pairs = oneLevelRoundAttempt(leaders, followers, levels, history, canPair, startOffset);
+    // Forbidden pairs can make the greedy pick leave someone out; penalise that heavily
     const dropped = Math.max(leaders.length, followers.length) - pairs.length;
-    const score = scoreLevelRound(pairs, levels, history) + dropped * 1000;
+    const missed = dropped + countSittingOut(pairs, leaders, followers);
+    const score = scoreLevelRound(pairs, levels, history) + missed * 1000;
     if (score < bestScore) {
       bestScore = score;
       bestPairs = pairs;
@@ -191,16 +210,27 @@ function generateRoundByLevelAvoidingRepeats(
   return bestPairs;
 }
 
-export function generatePairs(leaders: Person[], followers: Person[]): Pair[] {
-  return generateRoundAvoidingRepeats(leaders, followers, new Map());
+export function generatePairs(
+  leaders: Person[],
+  followers: Person[],
+  forbidden: ForbiddenPair[] = [],
+): Pair[] {
+  return generateRoundAvoidingRepeats(leaders, followers, new Map(), makeCanPair(forbidden));
 }
 
 export function generatePairsByLevel(
   leaders: Person[],
   followers: Person[],
   levels: string[],
+  forbidden: ForbiddenPair[] = [],
 ): Pair[] {
-  return generateRoundByLevelAvoidingRepeats(leaders, followers, levels, new Map());
+  return generateRoundByLevelAvoidingRepeats(
+    leaders,
+    followers,
+    levels,
+    new Map(),
+    makeCanPair(forbidden),
+  );
 }
 
 export function generateRounds(
@@ -209,14 +239,16 @@ export function generateRounds(
   iterations: number,
   pairByLevel: boolean,
   levels: string[],
+  forbidden: ForbiddenPair[] = [],
 ): Pair[][] {
-  const history = new Map<string, Set<string>>();
+  const history: History = new Map();
+  const canPair = makeCanPair(forbidden);
   const rounds: Pair[][] = [];
 
   for (let i = 0; i < iterations; i++) {
     const round = pairByLevel
-      ? generateRoundByLevelAvoidingRepeats(leaders, followers, levels, history)
-      : generateRoundAvoidingRepeats(leaders, followers, history);
+      ? generateRoundByLevelAvoidingRepeats(leaders, followers, levels, history, canPair)
+      : generateRoundAvoidingRepeats(leaders, followers, history, canPair);
     rounds.push(round);
 
     // Record both directions so two dual-role dancers swapping roles still counts as a repeat
