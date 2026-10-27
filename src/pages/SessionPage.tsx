@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
 import { generateRounds } from '../utils/pairing';
+import { canLead, canFollow, hasValidPair } from '../utils/roles';
 import type { Person } from '../types';
 import styles from './SessionPage.module.css';
 
@@ -32,9 +33,9 @@ export default function SessionPage() {
   }
 
   const presentPeople = room.people.filter((p) => presentIds.has(p.id));
-  const presentLeaders = presentPeople.filter((p) => p.role === 'leader');
-  const presentFollowers = presentPeople.filter((p) => p.role === 'follower');
-  const canGenerate = presentLeaders.length > 0 && presentFollowers.length > 0;
+  const presentLeaders = presentPeople.filter(canLead);
+  const presentFollowers = presentPeople.filter(canFollow);
+  const canGenerate = hasValidPair(presentLeaders, presentFollowers);
 
   const togglePerson = (person: Person) => {
     setPresentIds((prev) => {
@@ -57,8 +58,8 @@ export default function SessionPage() {
     navigate(`/rooms/${roomId}/sessions/${sessionId}`);
   };
 
-  const roomLeaders = room.people.filter((p) => p.role === 'leader');
-  const roomFollowers = room.people.filter((p) => p.role === 'follower');
+  const roomLeaders = room.people.filter(canLead);
+  const roomFollowers = room.people.filter(canFollow);
 
   return (
     <div className={styles.page}>
@@ -136,7 +137,9 @@ export default function SessionPage() {
         </p>
 
         {!canGenerate && presentPeople.length > 0 && (
-          <p className={styles.warning}>Need at least one leader and one follower.</p>
+          <p className={styles.warning}>
+            Need at least one leader and one follower who are different people.
+          </p>
         )}
       </main>
 

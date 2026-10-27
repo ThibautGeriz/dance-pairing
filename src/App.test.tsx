@@ -19,21 +19,24 @@ function renderApp(initialPath = '/') {
 
 const ROOM_ID = 'test-room-1';
 
+// `role` is the legacy single-role shape, still accepted via migration
+type SeedPerson = { id: string; name: string; level: string } & (
+  | { role: string }
+  | { roles: string[] }
+);
+
 function seedRooms(
   rooms: {
     id: string;
     name: string;
-    people: { id: string; name: string; role: string; level: string }[];
+    people: SeedPerson[];
     sessions?: unknown[];
   }[],
 ) {
   localStorage.setItem('dance-pairing:rooms', JSON.stringify(rooms));
 }
 
-function seedRoom(
-  people: { id: string; name: string; role: string; level: string }[] = [],
-  sessions: unknown[] = [],
-) {
+function seedRoom(people: SeedPerson[] = [], sessions: unknown[] = []) {
   seedRooms([{ id: ROOM_ID, name: 'Salsa', people, sessions }]);
 }
 
@@ -170,10 +173,49 @@ describe('Room page', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText(/leaders \(1\)/i)).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByRole('combobox', { name: /role/i }), 'follower');
+    await user.click(screen.getByRole('button', { name: 'Follower' }));
+    await user.click(screen.getByRole('button', { name: 'Leader' }));
     await user.type(screen.getByPlaceholderText(/person's name/i), 'Bob');
     await user.click(screen.getByRole('button', { name: 'Add' }));
     expect(screen.getByText('Bob')).toBeInTheDocument();
+    expect(screen.getByText(/followers \(1\)/i)).toBeInTheDocument();
+  });
+
+  it('adds a person with both roles to both columns', async () => {
+    const user = userEvent.setup();
+    seedRoom();
+    renderApp(`/rooms/${ROOM_ID}`);
+    await user.click(screen.getByRole('button', { name: 'Follower' }));
+    await user.type(screen.getByPlaceholderText(/person's name/i), 'Charlie');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getAllByText('Charlie')).toHaveLength(2);
+    expect(screen.getAllByText('L')).toHaveLength(2);
+    expect(screen.getAllByText('F')).toHaveLength(2);
+    expect(JSON.parse(localStorage.getItem('dance-pairing:rooms')!)[0].people[0].roles).toEqual([
+      'leader',
+      'follower',
+    ]);
+  });
+
+  it('keeps at least one role selected', async () => {
+    const user = userEvent.setup();
+    seedRoom();
+    renderApp(`/rooms/${ROOM_ID}`);
+    const leaderBtn = screen.getByRole('button', { name: 'Leader' });
+    await user.click(leaderBtn);
+    expect(leaderBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('migrates people stored with a single role field', async () => {
+    const user = userEvent.setup();
+    seedRoom([{ id: 'p1', name: 'Alice', role: 'follower', level: 'Novice' }]);
+    renderApp(`/rooms/${ROOM_ID}`);
+    expect(screen.getByText(/followers \(1\)/i)).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText(/person's name/i), 'Bob');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    const people = JSON.parse(localStorage.getItem('dance-pairing:rooms')!)[0].people;
+    expect(people[0]).toEqual({ id: 'p1', name: 'Alice', roles: ['follower'], level: 'Novice' });
+    expect(screen.getByText(/leaders \(1\)/i)).toBeInTheDocument();
     expect(screen.getByText(/followers \(1\)/i)).toBeInTheDocument();
   });
 
@@ -397,6 +439,26 @@ describe('Session page', () => {
       renderApp(`/rooms/${ROOM_ID}/session`);
       await user.click(screen.getAllByRole('checkbox')[0]); // uncheck Alice
       expect(screen.getByRole('button', { name: /generate pairs/i })).toBeDisabled();
+    });
+
+    it('disables generate when the only present dancer has both roles', () => {
+      seedRoom([{ id: 'p3', name: 'Charlie', roles: ['leader', 'follower'], level: 'Novice' }]);
+      renderApp(`/rooms/${ROOM_ID}/session`);
+      expect(screen.getByRole('button', { name: /generate pairs/i })).toBeDisabled();
+      expect(screen.getByText(/need at least one leader and one follower/i)).toBeInTheDocument();
+    });
+
+    it('pairs a dual-role dancer with others but never with themselves', async () => {
+      const user = userEvent.setup();
+      seedRoom([
+        { id: 'p1', name: 'Alice', role: 'leader', level: 'Novice' },
+        { id: 'p3', name: 'Charlie', roles: ['leader', 'follower'], level: 'Novice' },
+      ]);
+      renderApp(`/rooms/${ROOM_ID}/session`);
+      await user.click(screen.getByRole('button', { name: /generate pairs/i }));
+      const cards = screen.getAllByRole('listitem');
+      expect(cards).toHaveLength(1);
+      expect(cards[0]).toHaveTextContent(/Alice.*↔.*Charlie/);
     });
 
     it('toggles match-by-level option', async () => {

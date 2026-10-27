@@ -1,5 +1,6 @@
 import { useLocalStorage } from './useLocalStorage';
-import type { Room, Person, Role, Session, Pair } from '../types';
+import { normalizeRooms, toRoles } from '../utils/roles';
+import type { Room, Person, Roles, Session, Pair } from '../types';
 
 const STORAGE_KEY = 'dance-pairing:rooms';
 
@@ -8,7 +9,10 @@ function generateId(): string {
 }
 
 export function useRooms() {
-  const [rooms, setRooms] = useLocalStorage<Room[]>(STORAGE_KEY, []);
+  const [storedRooms, setStoredRooms] = useLocalStorage<Room[]>(STORAGE_KEY, []);
+  const rooms = normalizeRooms(storedRooms);
+  const setRooms = (update: (prev: Room[]) => Room[]) =>
+    setStoredRooms((prev) => update(normalizeRooms(prev)));
 
   const addRoom = (name: string) => {
     const newRoom: Room = { id: generateId(), name: name.trim(), people: [], sessions: [] };
@@ -23,8 +27,13 @@ export function useRooms() {
     setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, name: name.trim() } : r)));
   };
 
-  const addPerson = (roomId: string, name: string, role: Role, level: string) => {
-    const person: Person = { id: generateId(), name: name.trim(), role, level };
+  const addPerson = (roomId: string, name: string, roles: Roles, level: string) => {
+    const person: Person = {
+      id: generateId(),
+      name: name.trim(),
+      roles: toRoles(roles) ?? roles,
+      level,
+    };
     setRooms((prev) =>
       prev.map((r) => (r.id === roomId ? { ...r, people: [...r.people, person] } : r)),
     );

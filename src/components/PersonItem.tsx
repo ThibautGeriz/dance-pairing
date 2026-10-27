@@ -41,9 +41,11 @@ export default function PersonItem({
 
   return (
     <li className={styles.personItem}>
-      <span className={person.role === 'leader' ? styles.roleLeader : styles.roleFollower}>
-        {person.role === 'leader' ? 'L' : 'F'}
-      </span>
+      {person.roles.map((role) => (
+        <span key={role} className={role === 'leader' ? styles.roleLeader : styles.roleFollower}>
+          {role === 'leader' ? 'L' : 'F'}
+        </span>
+      ))}
 
       {editing ? (
         <input
