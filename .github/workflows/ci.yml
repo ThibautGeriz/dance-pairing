@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: ${{ matrix.script }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Report every failing check, not just the first one
+      fail-fast: false
+      matrix:
+        script: [typecheck, lint, format:check, test:coverage]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run ${{ matrix.script }}
