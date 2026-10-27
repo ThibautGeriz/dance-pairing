@@ -5,7 +5,7 @@
 - React 18 + TypeScript (strict mode, `react-jsx` preset)
 - CSS Modules (`.module.css`) — no Tailwind, no styled-components, no UI library
 - Vite as the build tool
-- React Router v6 with `HashRouter` for client-side routing
+- React Router v7 (imported from `react-router-dom`) with `HashRouter` for client-side routing
 - No backend; all state is persisted in `localStorage`
 - PWA: service worker (`public/sw.js`) + manifest for offline support
 
