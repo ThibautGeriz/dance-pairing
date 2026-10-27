@@ -516,7 +516,7 @@ describe('Never pair together', () => {
   });
 });
 
-describe('Ignore roles', () => {
+describe('Switch (no roles)', () => {
   const leadersOnly: SeedPerson[] = [
     { id: 'p1', name: 'Alice', roles: ['leader'], level: 'Novice' },
     { id: 'p2', name: 'Carol', roles: ['leader'], level: 'Novice' },
@@ -530,7 +530,7 @@ describe('Ignore roles', () => {
     const generate = screen.getByRole('button', { name: /generate pairs/i });
     expect(generate).toBeDisabled();
 
-    await user.click(screen.getByRole('checkbox', { name: /ignore roles/i }));
+    await user.click(screen.getByRole('checkbox', { name: 'Switch (no roles)' }));
     expect(screen.getByText(/2 dancers/)).toBeInTheDocument();
     expect(generate).toBeEnabled();
     await user.click(generate);
@@ -544,7 +544,7 @@ describe('Ignore roles', () => {
     const user = userEvent.setup();
     seedRoom(leadersOnly);
     renderApp(`/rooms/${ROOM_ID}/session`);
-    await user.click(screen.getByRole('checkbox', { name: /ignore roles/i }));
+    await user.click(screen.getByRole('checkbox', { name: 'Switch (no roles)' }));
     await user.click(screen.getByRole('button', { name: /generate pairs/i }));
     for (let i = 0; i < 3; i++) {
       expect(screen.getAllByRole('listitem')).toHaveLength(2);
@@ -558,7 +558,7 @@ describe('Ignore roles', () => {
     const user = userEvent.setup();
     seedRoom(leadersOnly.slice(0, 2), [], [['p1', 'p2']]);
     renderApp(`/rooms/${ROOM_ID}/session`);
-    await user.click(screen.getByRole('checkbox', { name: /ignore roles/i }));
+    await user.click(screen.getByRole('checkbox', { name: 'Switch (no roles)' }));
     expect(screen.getByRole('button', { name: /generate pairs/i })).toBeDisabled();
     expect(
       screen.getByText(/need at least two dancers who can dance together/i),
@@ -593,7 +593,7 @@ describe('Session page', () => {
       renderApp(`/rooms/${ROOM_ID}/session`);
       const peopleCbs = screen
         .getAllByRole('checkbox')
-        .filter((el) => !/Match|Ignore roles/.test(el.closest('label')?.textContent ?? ''));
+        .filter((el) => !/Match|Switch/.test(el.closest('label')?.textContent ?? ''));
       peopleCbs.forEach((cb) => expect(cb).toBeChecked());
     });
 

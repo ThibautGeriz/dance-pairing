@@ -131,7 +131,7 @@ export default function SessionPage() {
           </label>
 
           <label className={styles.optionLabel}>
-            <span>Ignore roles (anyone can dance with anyone)</span>
+            <span>Switch (no roles)</span>
             <input
               type="checkbox"
               className={styles.checkbox}
