@@ -4,14 +4,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import App from './App';
 
-const FUTURE_FLAGS = {
-  v7_startTransition: true,
-  v7_relativeSplatPath: true,
-};
-
 function renderApp(initialPath = '/') {
   return render(
-    <MemoryRouter initialEntries={[initialPath]} future={FUTURE_FLAGS}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <App />
     </MemoryRouter>,
   );
