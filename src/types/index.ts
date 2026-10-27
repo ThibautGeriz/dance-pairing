@@ -28,6 +28,8 @@ export interface Session {
   createdAt: number;
   rounds: Pair[][];
   pairByLevel?: boolean;
+  /** Pairs were made regardless of roles; `leader`/`follower` are just the two sides */
+  ignoreRoles?: boolean;
 }
 
 /** Ids of two people who must never be paired together (order does not matter) */
