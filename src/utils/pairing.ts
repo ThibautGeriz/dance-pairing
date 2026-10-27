@@ -1,6 +1,7 @@
 import { makeCanPair } from './forbidden';
+import { levelOf } from './roles';
 import type { CanPair } from './forbidden';
-import type { ForbiddenPair, Person, PersonId, Pair } from '../types';
+import type { ForbiddenPair, Person, PersonId, Pair, Role } from '../types';
 
 /** Partners each person has already danced with */
 type History = Map<PersonId, Set<PersonId>>;
@@ -53,8 +54,8 @@ function countSittingOut(pairs: Pair[], leaders: Person[], followers: Person[]):
   );
 }
 
-function getLevelIdx(person: Person, levels: string[]): number {
-  const idx = levels.indexOf(person.level);
+function getLevelIdx(person: Person, role: Role, levels: string[]): number {
+  const idx = levels.indexOf(levelOf(person, role));
   return idx === -1 ? levels.length : idx;
 }
 
@@ -116,7 +117,9 @@ function generateRoundAvoidingRepeats(
 
 function scoreLevelRound(pairs: Pair[], levels: string[], history: History): number {
   return pairs.reduce((total, { leader, follower }) => {
-    const dist = Math.abs(getLevelIdx(leader, levels) - getLevelIdx(follower, levels));
+    const dist = Math.abs(
+      getLevelIdx(leader, 'leader', levels) - getLevelIdx(follower, 'follower', levels),
+    );
     const repeat = hasDanced(history, leader, follower) ? 100 : 0;
     return total + dist + repeat;
   }, 0);
@@ -133,7 +136,8 @@ function oneLevelRoundAttempt(
   const n = Math.max(leaders.length, followers.length);
 
   // Shuffle within each level for randomness, then sort highest level first
-  const sl = fisherYates(leaders).sort((a, b) => getLevelIdx(b, levels) - getLevelIdx(a, levels));
+  const leaderIdx = (p: Person) => getLevelIdx(p, 'leader', levels);
+  const sl = fisherYates(leaders).sort((a, b) => leaderIdx(b) - leaderIdx(a));
 
   // Shuffle followers so tie-breaking is random
   const sf = fisherYates(followers);
@@ -145,7 +149,7 @@ function oneLevelRoundAttempt(
 
   for (let i = 0; i < n; i++) {
     const leader = sl[(i + startOffset) % sl.length];
-    const leaderLevelIdx = getLevelIdx(leader, levels);
+    const leaderLevelIdx = leaderIdx(leader);
     const candidates = sf.filter((f) => canPair(leader, f));
     if (candidates.length === 0) continue;
 
@@ -162,8 +166,8 @@ function oneLevelRoundAttempt(
       const fNew = !hasDanced(history, leader, f);
       if (fNew !== bNew) return fNew ? f : best;
 
-      const bDist = Math.abs(getLevelIdx(best, levels) - leaderLevelIdx);
-      const fDist = Math.abs(getLevelIdx(f, levels) - leaderLevelIdx);
+      const bDist = Math.abs(getLevelIdx(best, 'follower', levels) - leaderLevelIdx);
+      const fDist = Math.abs(getLevelIdx(f, 'follower', levels) - leaderLevelIdx);
       return fDist < bDist ? f : best;
     });
 

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
 import { generateOpenRounds, generateRounds } from '../utils/pairing';
-import { canLead, canFollow, hasValidOpenPair, hasValidPair } from '../utils/roles';
+import { canLead, canFollow, hasValidOpenPair, hasValidPair, levelOf } from '../utils/roles';
 import type { Person, PersonId } from '../types';
 import styles from './SessionPage.module.css';
 
@@ -95,7 +95,9 @@ export default function SessionPage() {
                   onChange={() => togglePerson(person)}
                 />
                 <span className={styles.checkName}>{person.name}</span>
-                {person.level && <span className={styles.checkLevel}>{person.level}</span>}
+                {levelOf(person, 'leader') && (
+                  <span className={styles.checkLevel}>{levelOf(person, 'leader')}</span>
+                )}
               </label>
             ))}
           </div>
@@ -113,7 +115,9 @@ export default function SessionPage() {
                   onChange={() => togglePerson(person)}
                 />
                 <span className={styles.checkName}>{person.name}</span>
-                {person.level && <span className={styles.checkLevel}>{person.level}</span>}
+                {levelOf(person, 'follower') && (
+                  <span className={styles.checkLevel}>{levelOf(person, 'follower')}</span>
+                )}
               </label>
             ))}
           </div>

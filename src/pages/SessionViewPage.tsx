@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
 import { generateOpenRounds, generateRounds } from '../utils/pairing';
+import { levelOf } from '../utils/roles';
 import type { Person, PersonId } from '../types';
 import styles from './SessionViewPage.module.css';
 
@@ -81,47 +82,53 @@ export default function SessionViewPage() {
             leaderSeq.set(pair.leader.id, lo);
             const fo = (followerSeq.get(pair.follower.id) ?? 0) + 1;
             followerSeq.set(pair.follower.id, fo);
-            return { pair, leaderOrdinal: lo, followerOrdinal: fo };
+            return {
+              pair,
+              leaderOrdinal: lo,
+              followerOrdinal: fo,
+              leaderLevel: levelOf(pair.leader, 'leader'),
+              followerLevel: levelOf(pair.follower, 'follower'),
+            };
           });
           return (
             <div key={ri}>
               {session.rounds.length > 1 && <h2 className={styles.roundTitle}>Round {ri + 1}</h2>}
               <ul className={styles.pairsList}>
-                {annotated.map(({ pair, leaderOrdinal, followerOrdinal }, pi) => (
-                  <li key={pi} className={styles.pairCard}>
-                    <div className={styles.pairSide}>
-                      <div className={styles.personInfo}>
-                        <span className={ignoreRoles ? styles.neutralName : styles.leaderName}>
-                          {pair.leader.name}
-                        </span>
-                        {pair.leader.level && (
-                          <span className={styles.pairLevel}>{pair.leader.level}</span>
+                {annotated.map(
+                  ({ pair, leaderOrdinal, followerOrdinal, leaderLevel, followerLevel }, pi) => (
+                    <li key={pi} className={styles.pairCard}>
+                      <div className={styles.pairSide}>
+                        <div className={styles.personInfo}>
+                          <span className={ignoreRoles ? styles.neutralName : styles.leaderName}>
+                            {pair.leader.name}
+                          </span>
+                          {leaderLevel && <span className={styles.pairLevel}>{leaderLevel}</span>}
+                        </div>
+                        {leaderOrdinal > 1 && (
+                          <span className={styles.badge} title={`Dance #${leaderOrdinal}`}>
+                            ×{leaderOrdinal}
+                          </span>
                         )}
                       </div>
-                      {leaderOrdinal > 1 && (
-                        <span className={styles.badge} title={`Dance #${leaderOrdinal}`}>
-                          ×{leaderOrdinal}
-                        </span>
-                      )}
-                    </div>
-                    <span className={styles.divider}>↔</span>
-                    <div className={`${styles.pairSide} ${styles.pairSideRight}`}>
-                      {followerOrdinal > 1 && (
-                        <span className={styles.badge} title={`Dance #${followerOrdinal}`}>
-                          ×{followerOrdinal}
-                        </span>
-                      )}
-                      <div className={`${styles.personInfo} ${styles.personInfoRight}`}>
-                        {pair.follower.level && (
-                          <span className={styles.pairLevel}>{pair.follower.level}</span>
+                      <span className={styles.divider}>↔</span>
+                      <div className={`${styles.pairSide} ${styles.pairSideRight}`}>
+                        {followerOrdinal > 1 && (
+                          <span className={styles.badge} title={`Dance #${followerOrdinal}`}>
+                            ×{followerOrdinal}
+                          </span>
                         )}
-                        <span className={ignoreRoles ? styles.neutralName : styles.followerName}>
-                          {pair.follower.name}
-                        </span>
+                        <div className={`${styles.personInfo} ${styles.personInfoRight}`}>
+                          {followerLevel && (
+                            <span className={styles.pairLevel}>{followerLevel}</span>
+                          )}
+                          <span className={ignoreRoles ? styles.neutralName : styles.followerName}>
+                            {pair.follower.name}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  ),
+                )}
               </ul>
             </div>
           );

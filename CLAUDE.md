@@ -80,7 +80,7 @@ src/
 
 - Inline editing: toggle `editingId` state; commit on Enter/blur/button; cancel on Escape
 - Double-click to edit on RoomsPage (250ms timeout to distinguish from single-click navigation)
-- Level badge cycling: click cycles through available levels, wraps at end
+- Level badge cycling: click cycles through available levels, wraps at end; in each column it changes the level of that role only
 - Session history: displayed newest-first with "Show more" pagination (3 at a time)
 - All add operations clear the input field after submission
 - Empty/whitespace-only inputs are rejected for all create/rename operations
@@ -97,7 +97,7 @@ src/
   - `generateOpenRounds(people, iterations, pairByLevel, levels, forbidden?)` — "Ignore roles" session option: anyone can dance with anyone; splits the pool into two random halves and reuses the role-based round logic (stored as `Session.ignoreRoles`)
 - If leaders > followers (or vice versa): the shorter side cycles so everyone dances
 - Forbidden pairs (`Room.forbiddenPairs`, "Never pair together" on RoomPage) are never generated; an invalid pair is fixed by swapping followers with another pair, or dropped if no swap works
-- A person has one or two roles (`roles: [Role] | [Role, Role]`); with both they sit in both pools and are never paired with themselves (identity is by `id`)
+- A person has one or two roles, each with its own level (`roles: [RoleLevel] | [RoleLevel, RoleLevel]`, `RoleLevel = { role, level }`); level matching uses the level of the role being danced (`levelOf(person, role)`). With both roles they sit in both pools and are never paired with themselves (identity is by `id`)
 - Uses Fisher-Yates shuffle; tries up to 20 shuffle/rotation combinations and picks the lowest-score result
 - Level scoring: penalises level distance between paired dancers; repeat pairs cost 100 points
 
