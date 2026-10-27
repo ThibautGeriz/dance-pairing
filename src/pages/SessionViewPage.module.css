@@ -103,6 +103,14 @@
   text-transform: capitalize;
 }
 
+.neutralName {
+  color: var(--color-text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .followerName {
   color: var(--color-follower);
   font-weight: 500;

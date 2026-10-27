@@ -26,3 +26,9 @@ export function hasValidPair(
   const canPair = makeCanPair(forbidden);
   return leaders.some((l) => followers.some((f) => canPair(l, f)));
 }
+
+/** Roles ignored: true when any two different people may be paired. */
+export function hasValidOpenPair(people: Person[], forbidden: ForbiddenPair[] = []): boolean {
+  const canPair = makeCanPair(forbidden);
+  return people.some((a, i) => people.slice(i + 1).some((b) => canPair(a, b)));
+}

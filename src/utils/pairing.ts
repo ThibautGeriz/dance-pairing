@@ -233,6 +233,75 @@ export function generatePairsByLevel(
   );
 }
 
+/** Build `iterations` rounds, sharing partner history so later rounds avoid repeats. */
+function buildRounds(iterations: number, makeRound: (history: History) => Pair[]): Pair[][] {
+  const history: History = new Map();
+  const rounds: Pair[][] = [];
+
+  for (let i = 0; i < iterations; i++) {
+    const round = makeRound(history);
+    rounds.push(round);
+
+    // Record both directions so two dancers swapping sides still counts as a repeat
+    for (const { leader, follower } of round) {
+      recordPair(history, leader, follower);
+      recordPair(history, follower, leader);
+    }
+  }
+
+  return rounds;
+}
+
+function makeRoleRound(
+  leaders: Person[],
+  followers: Person[],
+  pairByLevel: boolean,
+  levels: string[],
+  history: History,
+  canPair: CanPair,
+): Pair[] {
+  return pairByLevel
+    ? generateRoundByLevelAvoidingRepeats(leaders, followers, levels, history, canPair)
+    : generateRoundAvoidingRepeats(leaders, followers, history, canPair);
+}
+
+/**
+ * Roles ignored: anyone may dance with anyone (if allowed).
+ * Split the pool into two random halves and pair them like leaders/followers; with an odd
+ * count the smaller half cycles, so one person dances twice. Keep the best of several splits.
+ */
+function generateOpenRound(
+  people: Person[],
+  pairByLevel: boolean,
+  levels: string[],
+  history: History,
+  canPair: CanPair,
+): Pair[] {
+  if (people.length < 2) return [];
+  const half = Math.ceil(people.length / 2);
+
+  let bestPairs: Pair[] = [];
+  let bestScore = Infinity;
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const shuffled = fisherYates(people);
+    const a = shuffled.slice(0, half);
+    const b = shuffled.slice(half);
+    const pairs = makeRoleRound(a, b, pairByLevel, levels, history, canPair);
+    const missed = half - pairs.length + countSittingOut(pairs, a, b);
+    const levelScore = pairByLevel ? scoreLevelRound(pairs, levels, history) : 0;
+    const repeats = pairs.filter((p) => hasDanced(history, p.leader, p.follower)).length;
+    const score = missed * 1000 + repeats * 100 + levelScore;
+    if (score < bestScore) {
+      bestScore = score;
+      bestPairs = pairs;
+      if (score === 0) break;
+    }
+  }
+
+  return bestPairs;
+}
+
 export function generateRounds(
   leaders: Person[],
   followers: Person[],
@@ -241,22 +310,22 @@ export function generateRounds(
   levels: string[],
   forbidden: ForbiddenPair[] = [],
 ): Pair[][] {
-  const history: History = new Map();
   const canPair = makeCanPair(forbidden);
-  const rounds: Pair[][] = [];
+  return buildRounds(iterations, (history) =>
+    makeRoleRound(leaders, followers, pairByLevel, levels, history, canPair),
+  );
+}
 
-  for (let i = 0; i < iterations; i++) {
-    const round = pairByLevel
-      ? generateRoundByLevelAvoidingRepeats(leaders, followers, levels, history, canPair)
-      : generateRoundAvoidingRepeats(leaders, followers, history, canPair);
-    rounds.push(round);
-
-    // Record both directions so two dual-role dancers swapping roles still counts as a repeat
-    for (const { leader, follower } of round) {
-      recordPair(history, leader, follower);
-      recordPair(history, follower, leader);
-    }
-  }
-
-  return rounds;
+/** Like `generateRounds`, but roles are ignored: anyone can be paired with anyone. */
+export function generateOpenRounds(
+  people: Person[],
+  iterations: number,
+  pairByLevel: boolean,
+  levels: string[],
+  forbidden: ForbiddenPair[] = [],
+): Pair[][] {
+  const canPair = makeCanPair(forbidden);
+  return buildRounds(iterations, (history) =>
+    generateOpenRound(people, pairByLevel, levels, history, canPair),
+  );
 }

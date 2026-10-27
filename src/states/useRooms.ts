@@ -109,9 +109,14 @@ export function useRooms() {
     );
   };
 
-  const addSession = (roomId: string, rounds: Pair[][], pairByLevel: boolean): string => {
+  const addSession = (
+    roomId: string,
+    rounds: Pair[][],
+    pairByLevel: boolean,
+    ignoreRoles: boolean,
+  ): string => {
     const id = generateId();
-    const session: Session = { id, createdAt: Date.now(), rounds, pairByLevel };
+    const session: Session = { id, createdAt: Date.now(), rounds, pairByLevel, ignoreRoles };
     setRooms((prev) =>
       prev.map((r) => (r.id === roomId ? { ...r, sessions: [...r.sessions, session] } : r)),
     );

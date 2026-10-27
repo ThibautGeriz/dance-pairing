@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
-import { generateRounds } from '../utils/pairing';
+import { generateOpenRounds, generateRounds } from '../utils/pairing';
 import type { Person, PersonId } from '../types';
 import styles from './SessionViewPage.module.css';
 
@@ -37,16 +37,25 @@ export default function SessionViewPage() {
   const sessionFollowers = [...followerMap.values()];
   const iterations = session.rounds.length;
   const pairByLevel = session.pairByLevel ?? false;
+  const ignoreRoles = session.ignoreRoles ?? false;
 
   const reshuffle = () => {
-    const newRounds = generateRounds(
-      sessionLeaders,
-      sessionFollowers,
-      iterations,
-      pairByLevel,
-      settings.levels,
-      room.forbiddenPairs,
-    );
+    const newRounds = ignoreRoles
+      ? generateOpenRounds(
+          [...new Map([...leaderMap, ...followerMap]).values()],
+          iterations,
+          pairByLevel,
+          settings.levels,
+          room.forbiddenPairs,
+        )
+      : generateRounds(
+          sessionLeaders,
+          sessionFollowers,
+          iterations,
+          pairByLevel,
+          settings.levels,
+          room.forbiddenPairs,
+        );
     updateSessionRounds(roomId!, sessionId!, newRounds);
   };
 
@@ -65,7 +74,8 @@ export default function SessionViewPage() {
       <main className={styles.main}>
         {session.rounds.map((round, ri) => {
           const leaderSeq = new Map<PersonId, number>();
-          const followerSeq = new Map<PersonId, number>();
+          // Without roles a person may appear on either side, so count their dances together
+          const followerSeq = ignoreRoles ? leaderSeq : new Map<PersonId, number>();
           const annotated = round.map((pair) => {
             const lo = (leaderSeq.get(pair.leader.id) ?? 0) + 1;
             leaderSeq.set(pair.leader.id, lo);
@@ -81,7 +91,9 @@ export default function SessionViewPage() {
                   <li key={pi} className={styles.pairCard}>
                     <div className={styles.pairSide}>
                       <div className={styles.personInfo}>
-                        <span className={styles.leaderName}>{pair.leader.name}</span>
+                        <span className={ignoreRoles ? styles.neutralName : styles.leaderName}>
+                          {pair.leader.name}
+                        </span>
                         {pair.leader.level && (
                           <span className={styles.pairLevel}>{pair.leader.level}</span>
                         )}
@@ -103,7 +115,9 @@ export default function SessionViewPage() {
                         {pair.follower.level && (
                           <span className={styles.pairLevel}>{pair.follower.level}</span>
                         )}
-                        <span className={styles.followerName}>{pair.follower.name}</span>
+                        <span className={ignoreRoles ? styles.neutralName : styles.followerName}>
+                          {pair.follower.name}
+                        </span>
                       </div>
                     </div>
                   </li>
