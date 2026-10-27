@@ -94,6 +94,7 @@ src/
   - `generatePairsByLevel(leaders, followers, levels)` — single round, matched by skill level proximity
   - `generateRounds(leaders, followers, iterations, pairByLevel, levels)` — multiple rounds with cross-round history tracking to avoid repeats
 - If leaders > followers (or vice versa): the shorter side cycles so everyone dances
+- A person has one or two roles (`roles: [Role] | [Role, Role]`); with both they sit in both pools and are never paired with themselves (identity is by `id`)
 - Uses Fisher-Yates shuffle; tries up to 20 shuffle/rotation combinations and picks the lowest-score result
 - Level scoring: penalises level distance between paired dancers; repeat pairs cost 100 points
 

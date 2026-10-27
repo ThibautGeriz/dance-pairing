@@ -1,19 +1,27 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { generatePairs, generatePairsByLevel, generateRounds } from './pairing';
-import type { Person } from '../types';
+import type { Pair, Person } from '../types';
 
 const leader = (id: string, level = 'Newcomer'): Person => ({
   id,
   name: `Leader ${id}`,
-  role: 'leader',
+  roles: ['leader'],
   level,
 });
 const follower = (id: string, level = 'Newcomer'): Person => ({
   id,
   name: `Follower ${id}`,
-  role: 'follower',
+  roles: ['follower'],
   level,
 });
+const both = (id: string, level = 'Newcomer'): Person => ({
+  id,
+  name: `Both ${id}`,
+  roles: ['leader', 'follower'],
+  level,
+});
+
+const hasSelfPair = (pairs: Pair[]) => pairs.some((p) => p.leader.id === p.follower.id);
 
 describe('generatePairs', () => {
   it('returns empty when leaders is empty', () => {
@@ -221,5 +229,71 @@ describe('generateRounds', () => {
     );
     expect(rounds[0]).toHaveLength(2);
     expect(rounds[1]).toHaveLength(2);
+  });
+});
+
+describe('dancers with both roles', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('never pairs a dancer with themselves in random mode', () => {
+    const b = both('b');
+    for (let i = 0; i < 50; i++) {
+      const pairs = generatePairs([leader('a'), b], [b, follower('x')]);
+      expect(pairs).toHaveLength(2);
+      expect(hasSelfPair(pairs)).toBe(false);
+    }
+  });
+
+  it('swaps followers to break a self-pair produced by the shuffle', () => {
+    // Math.random ≈ 1 leaves both shuffles in input order: b-b and c-c, which must be swapped
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const b = both('b');
+    const c = both('c');
+    const pairs = generatePairs([b, c], [b, c]);
+    expect(pairs).toHaveLength(2);
+    expect(hasSelfPair(pairs)).toBe(false);
+  });
+
+  it('drops the self-pair when no swap can fix it', () => {
+    const b = both('b');
+    const pairs = generatePairs([leader('a'), b], [b]);
+    expect(pairs).toEqual([{ leader: expect.objectContaining({ id: 'a' }), follower: b }]);
+  });
+
+  it('returns no pairs when the only dancer has both roles', () => {
+    const b = both('b');
+    expect(generatePairs([b], [b])).toEqual([]);
+    expect(generatePairsByLevel([b], [b], ['Newcomer'])).toEqual([]);
+  });
+
+  it('never pairs a dancer with themselves in level mode', () => {
+    const levels = ['Newcomer', 'Advanced'];
+    const b = both('b', 'Advanced');
+    for (let i = 0; i < 50; i++) {
+      const pairs = generatePairsByLevel(
+        [leader('a', 'Newcomer'), b],
+        [b, follower('x', 'Advanced')],
+        levels,
+      );
+      expect(pairs).toHaveLength(2);
+      expect(hasSelfPair(pairs)).toBe(false);
+    }
+  });
+
+  it('never pairs a dancer with themselves across rounds in either mode', () => {
+    const b = both('b');
+    const c = both('c');
+    for (const pairByLevel of [false, true]) {
+      const rounds = generateRounds([b, c, leader('a')], [b, c, follower('x')], 5, pairByLevel, [
+        'Newcomer',
+      ]);
+      expect(rounds).toHaveLength(5);
+      rounds.forEach((r) => {
+        expect(r).toHaveLength(3);
+        expect(hasSelfPair(r)).toBe(false);
+      });
+    }
   });
 });

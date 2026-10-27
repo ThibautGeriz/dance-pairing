@@ -4,7 +4,9 @@ import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
 import PersonItem from '../components/PersonItem';
 import SessionCard from '../components/SessionCard';
-import type { Role } from '../types';
+import { canLead, canFollow, toRoles } from '../utils/roles';
+import { ROLES } from '../types';
+import type { Role, Roles } from '../types';
 import styles from './RoomPage.module.css';
 
 export default function RoomPage() {
@@ -14,7 +16,7 @@ export default function RoomPage() {
   const { settings } = useSettings();
 
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState<Role>('leader');
+  const [newRoles, setNewRoles] = useState<Roles>(['leader']);
   const [newLevel, setNewLevel] = useState(() => settings.levels[0] ?? '');
   const [visibleSessionCount, setVisibleSessionCount] = useState(3);
 
@@ -32,8 +34,8 @@ export default function RoomPage() {
     );
   }
 
-  const leaders = room.people.filter((p) => p.role === 'leader');
-  const followers = room.people.filter((p) => p.role === 'follower');
+  const leaders = room.people.filter(canLead);
+  const followers = room.people.filter(canFollow);
   const reversedSessions = [...room.sessions].reverse();
   const visibleSessions = reversedSessions.slice(0, visibleSessionCount);
   const hasMore = reversedSessions.length > visibleSessionCount;
@@ -41,8 +43,16 @@ export default function RoomPage() {
   const handleAdd = () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    addPerson(roomId, trimmed, newRole, newLevel);
+    addPerson(roomId, trimmed, newRoles, newLevel);
     setNewName('');
+  };
+
+  // A person always keeps at least one role
+  const toggleRole = (role: Role) => {
+    setNewRoles((prev) => {
+      const next = prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role];
+      return toRoles(next) ?? prev;
+    });
   };
 
   return (
@@ -71,15 +81,28 @@ export default function RoomPage() {
             placeholder="Person's name…"
             aria-label="Person's name"
           />
-          <select
-            className={styles.select}
-            value={newRole}
-            onChange={(e) => setNewRole(e.target.value as Role)}
-            aria-label="Role"
-          >
-            <option value="leader">Leader</option>
-            <option value="follower">Follower</option>
-          </select>
+          <fieldset className={styles.roleToggles}>
+            <legend className={styles.visuallyHidden}>Roles</legend>
+            {ROLES.map((role) => {
+              const checked = newRoles.includes(role);
+              return (
+                <label
+                  key={role}
+                  className={`${styles.roleToggle} ${role === 'leader' ? styles.roleToggleLeader : styles.roleToggleFollower}`}
+                >
+                  <input
+                    type="checkbox"
+                    className={styles.roleCheckbox}
+                    checked={checked}
+                    // The last selected role cannot be removed
+                    disabled={checked && newRoles.length === 1}
+                    onChange={() => toggleRole(role)}
+                  />
+                  {role === 'leader' ? 'Leader' : 'Follower'}
+                </label>
+              );
+            })}
+          </fieldset>
           <select
             className={styles.select}
             value={newLevel}

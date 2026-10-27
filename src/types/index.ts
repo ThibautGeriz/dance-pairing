@@ -1,9 +1,15 @@
 export type Role = 'leader' | 'follower';
 
+export const ROLES: Role[] = ['leader', 'follower'];
+
+/** One or two unique roles */
+export type Roles = [Role] | [Role, Role];
+
 export interface Person {
   id: string;
   name: string;
-  role: Role;
+  /** A person with both roles may lead or follow, but never dances with themselves */
+  roles: Roles;
   level: string;
 }
 
