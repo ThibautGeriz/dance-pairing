@@ -87,13 +87,37 @@
   border-color: var(--color-primary);
 }
 
+/* Mobile: one full-width row per role (checkbox + level picker) */
 .roleToggles {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-xs);
+  flex: 1 1 100%;
   border: none;
   margin: 0;
   padding: 0;
   min-width: 0;
+}
+
+.roleWithLevel .select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Same width for both checkboxes so the level pickers line up */
+.roleWithLevel .roleToggle {
+  flex: 0 0 8rem;
+}
+
+@media (min-width: 600px) {
+  .roleToggles {
+    flex: 0 1 auto;
+  }
+
+  .roleWithLevel .select,
+  .roleWithLevel .roleToggle {
+    flex: 0 1 auto;
+  }
 }
 
 .visuallyHidden {
@@ -111,6 +135,14 @@
 .roleWithLevel {
   display: flex;
   gap: var(--spacing-xs);
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+@media (min-width: 600px) {
+  .roleWithLevel {
+    flex: 0 0 auto;
+  }
 }
 
 .roleToggle {
