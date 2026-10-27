@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
 import { generateRounds } from '../utils/pairing';
-import type { Person } from '../types';
+import type { Person, PersonId } from '../types';
 import styles from './SessionViewPage.module.css';
 
 export default function SessionViewPage() {
@@ -25,8 +25,8 @@ export default function SessionViewPage() {
   }
 
   // Derive participants from stored rounds (deduplicated by id)
-  const leaderMap = new Map<string, Person>();
-  const followerMap = new Map<string, Person>();
+  const leaderMap = new Map<PersonId, Person>();
+  const followerMap = new Map<PersonId, Person>();
   for (const round of session.rounds) {
     for (const pair of round) {
       leaderMap.set(pair.leader.id, pair.leader);
@@ -45,6 +45,7 @@ export default function SessionViewPage() {
       iterations,
       pairByLevel,
       settings.levels,
+      room.forbiddenPairs,
     );
     updateSessionRounds(roomId!, sessionId!, newRounds);
   };
@@ -63,8 +64,8 @@ export default function SessionViewPage() {
 
       <main className={styles.main}>
         {session.rounds.map((round, ri) => {
-          const leaderSeq = new Map<string, number>();
-          const followerSeq = new Map<string, number>();
+          const leaderSeq = new Map<PersonId, number>();
+          const followerSeq = new Map<PersonId, number>();
           const annotated = round.map((pair) => {
             const lo = (leaderSeq.get(pair.leader.id) ?? 0) + 1;
             leaderSeq.set(pair.leader.id, lo);

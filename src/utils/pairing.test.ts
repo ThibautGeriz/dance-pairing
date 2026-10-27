@@ -1,21 +1,23 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { generatePairs, generatePairsByLevel, generateRounds } from './pairing';
-import type { Pair, Person } from '../types';
+import type { Pair, Person, PersonId } from '../types';
+
+const pid = (id: string) => id as PersonId;
 
 const leader = (id: string, level = 'Newcomer'): Person => ({
-  id,
+  id: pid(id),
   name: `Leader ${id}`,
   roles: ['leader'],
   level,
 });
 const follower = (id: string, level = 'Newcomer'): Person => ({
-  id,
+  id: pid(id),
   name: `Follower ${id}`,
   roles: ['follower'],
   level,
 });
 const both = (id: string, level = 'Newcomer'): Person => ({
-  id,
+  id: pid(id),
   name: `Both ${id}`,
   roles: ['leader', 'follower'],
   level,
@@ -109,8 +111,8 @@ describe('generatePairsByLevel', () => {
     expect(pairs).toHaveLength(2);
     expect(pairs.every((p) => p.leader.id === 'a')).toBe(true);
     const usedFollowerIds = new Set(pairs.map((p) => p.follower.id));
-    expect(usedFollowerIds.has('x')).toBe(true);
-    expect(usedFollowerIds.has('y')).toBe(true);
+    expect(usedFollowerIds.has(pid('x'))).toBe(true);
+    expect(usedFollowerIds.has(pid('y'))).toBe(true);
   });
 
   it('leaves extra dancers from uneven levels and pairs them', () => {
@@ -121,9 +123,9 @@ describe('generatePairsByLevel', () => {
     expect(pairs).toHaveLength(2);
     const allLeaderIds = new Set(pairs.map((p) => p.leader.id));
     const allFollowerIds = new Set(pairs.map((p) => p.follower.id));
-    expect(allLeaderIds.has('a') || allLeaderIds.has('b')).toBe(true);
-    expect(allFollowerIds.has('x')).toBe(true);
-    expect(allFollowerIds.has('y')).toBe(true);
+    expect(allLeaderIds.has(pid('a')) || allLeaderIds.has(pid('b'))).toBe(true);
+    expect(allFollowerIds.has(pid('x'))).toBe(true);
+    expect(allFollowerIds.has(pid('y'))).toBe(true);
   });
 
   it('generates max pairs when followers outnumber leaders (all same level)', () => {
@@ -293,6 +295,69 @@ describe('dancers with both roles', () => {
       rounds.forEach((r) => {
         expect(r).toHaveLength(3);
         expect(hasSelfPair(r)).toBe(false);
+      });
+    }
+  });
+});
+
+describe('forbidden pairs', () => {
+  const pairKeys = (pairs: Pair[]) => pairs.map((p) => `${p.leader.id}-${p.follower.id}`).sort();
+
+  it('never pairs forbidden dancers in random mode', () => {
+    for (let i = 0; i < 50; i++) {
+      const pairs = generatePairs(
+        [leader('a'), leader('b')],
+        [follower('x'), follower('y')],
+        [[pid('a'), pid('x')]],
+      );
+      expect(pairKeys(pairs)).toEqual(['a-y', 'b-x']);
+    }
+  });
+
+  it('ignores the order of the two dancers in a forbidden pair', () => {
+    for (let i = 0; i < 20; i++) {
+      const pairs = generatePairs(
+        [leader('a'), leader('b')],
+        [follower('x'), follower('y')],
+        [[pid('x'), pid('a')]],
+      );
+      expect(pairKeys(pairs)).toEqual(['a-y', 'b-x']);
+    }
+  });
+
+  it('never pairs forbidden dancers in level mode, even with matching levels', () => {
+    const levels = ['Newcomer', 'Advanced'];
+    for (let i = 0; i < 50; i++) {
+      const pairs = generatePairsByLevel(
+        [leader('a', 'Advanced'), leader('b', 'Newcomer')],
+        [follower('x', 'Advanced'), follower('y', 'Newcomer')],
+        levels,
+        [[pid('a'), pid('x')]],
+      );
+      expect(pairKeys(pairs)).toEqual(['a-y', 'b-x']);
+    }
+  });
+
+  it('returns no pairs when the only possible pair is forbidden', () => {
+    const forbidden: [PersonId, PersonId][] = [[pid('a'), pid('x')]];
+    expect(generatePairs([leader('a')], [follower('x')], forbidden)).toEqual([]);
+    expect(generatePairsByLevel([leader('a')], [follower('x')], [], forbidden)).toEqual([]);
+  });
+
+  it('respects forbidden pairs in every round in both modes', () => {
+    const leaders = [leader('a'), leader('b'), leader('c')];
+    const followers = [follower('x'), follower('y'), follower('z')];
+    const forbidden: [PersonId, PersonId][] = [
+      [pid('a'), pid('x')],
+      [pid('b'), pid('y')],
+    ];
+    for (const pairByLevel of [false, true]) {
+      const rounds = generateRounds(leaders, followers, 5, pairByLevel, ['Newcomer'], forbidden);
+      rounds.forEach((round) => {
+        const keys = pairKeys(round);
+        expect(keys).toHaveLength(3);
+        expect(keys).not.toContain('a-x');
+        expect(keys).not.toContain('b-y');
       });
     }
   });

@@ -51,6 +51,7 @@ src/
 - Page components live in `src/pages/`; inline sub-components (e.g. `PersonItem`, `SessionCard`) are defined within the same file
 - Custom hooks live in `src/states/`; prefix with `use`
 - Types and interfaces live in `src/types/index.ts`; no inline anonymous object types for shared shapes
+- Person ids use the branded `PersonId` type, never plain `string`; only `useRooms` creates them (one cast), and form values are resolved back to a known person rather than cast
 - Avoid `any`; use `unknown` and narrow when necessary
 - Keep components small; extract sub-components rather than growing a single file
 - Use `crypto.randomUUID()` for generating IDs
@@ -68,7 +69,7 @@ src/
 ## State management
 
 - `localStorage` is the single source of truth; two keys:
-  - `dance-pairing:rooms` — full `Room[]` array (people + sessions)
+  - `dance-pairing:rooms` — full `Room[]` array (people + sessions + forbidden pairs); older shapes are migrated on read in `src/utils/storage.ts`
   - `dance-pairing:settings` — `Settings` object (configured levels)
 - Use the `useLocalStorage<T>` generic hook for all persistence
 - Domain hooks: `useRooms` (rooms/people/sessions), `useSettings` (difficulty levels)
@@ -89,11 +90,12 @@ src/
 
 - Lives in `src/utils/pairing.ts`
 - Must be pure functions; no side effects
-- Three exported functions:
-  - `generatePairs(leaders, followers)` — single random round, no history
-  - `generatePairsByLevel(leaders, followers, levels)` — single round, matched by skill level proximity
-  - `generateRounds(leaders, followers, iterations, pairByLevel, levels)` — multiple rounds with cross-round history tracking to avoid repeats
+- Three exported functions (each takes an optional trailing `forbidden: ForbiddenPair[]`):
+  - `generatePairs(leaders, followers, forbidden?)` — single random round, no history
+  - `generatePairsByLevel(leaders, followers, levels, forbidden?)` — single round, matched by skill level proximity
+  - `generateRounds(leaders, followers, iterations, pairByLevel, levels, forbidden?)` — multiple rounds with cross-round history tracking to avoid repeats
 - If leaders > followers (or vice versa): the shorter side cycles so everyone dances
+- Forbidden pairs (`Room.forbiddenPairs`, "Never pair together" on RoomPage) are never generated; an invalid pair is fixed by swapping followers with another pair, or dropped if no swap works
 - A person has one or two roles (`roles: [Role] | [Role, Role]`); with both they sit in both pools and are never paired with themselves (identity is by `id`)
 - Uses Fisher-Yates shuffle; tries up to 20 shuffle/rotation combinations and picks the lowest-score result
 - Level scoring: penalises level distance between paired dancers; repeat pairs cost 100 points

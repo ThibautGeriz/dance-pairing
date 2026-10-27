@@ -4,6 +4,7 @@ import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
 import PersonItem from '../components/PersonItem';
 import SessionCard from '../components/SessionCard';
+import ForbiddenPairs from '../components/ForbiddenPairs';
 import { canLead, canFollow, toRoles } from '../utils/roles';
 import { ROLES } from '../types';
 import type { Role, Roles } from '../types';
@@ -12,7 +13,15 @@ import styles from './RoomPage.module.css';
 export default function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { getRoom, addPerson, removePerson, renamePerson, changePersonLevel } = useRooms();
+  const {
+    getRoom,
+    addPerson,
+    removePerson,
+    renamePerson,
+    changePersonLevel,
+    addForbiddenPair,
+    removeForbiddenPair,
+  } = useRooms();
   const { settings } = useSettings();
 
   const [newName, setNewName] = useState('');
@@ -159,6 +168,15 @@ export default function RoomPage() {
             {followers.length === 0 && <p className={styles.emptyCol}>No followers yet</p>}
           </section>
         </div>
+
+        {room.people.length >= 2 && (
+          <ForbiddenPairs
+            people={room.people}
+            forbiddenPairs={room.forbiddenPairs}
+            onAdd={(a, b) => addForbiddenPair(roomId, a, b)}
+            onRemove={(a, b) => removeForbiddenPair(roomId, a, b)}
+          />
+        )}
 
         {visibleSessions.length > 0 && (
           <section className={styles.sessionsSection}>

@@ -5,8 +5,13 @@ export const ROLES: Role[] = ['leader', 'follower'];
 /** One or two unique roles */
 export type Roles = [Role] | [Role, Role];
 
+declare const personIdBrand: unique symbol;
+
+/** Branded so a plain string (room id, raw form value…) can't be used as a person id */
+export type PersonId = string & { readonly [personIdBrand]: true };
+
 export interface Person {
-  id: string;
+  id: PersonId;
   name: string;
   /** A person with both roles may lead or follow, but never dances with themselves */
   roles: Roles;
@@ -25,11 +30,15 @@ export interface Session {
   pairByLevel?: boolean;
 }
 
+/** Ids of two people who must never be paired together (order does not matter) */
+export type ForbiddenPair = [PersonId, PersonId];
+
 export interface Room {
   id: string;
   name: string;
   people: Person[];
   sessions: Session[];
+  forbiddenPairs: ForbiddenPair[];
 }
 
 export interface Settings {
