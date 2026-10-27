@@ -173,8 +173,8 @@ describe('Room page', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText(/leaders \(1\)/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Follower' }));
-    await user.click(screen.getByRole('button', { name: 'Leader' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Follower' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Leader' }));
     await user.type(screen.getByPlaceholderText(/person's name/i), 'Bob');
     await user.click(screen.getByRole('button', { name: 'Add' }));
     expect(screen.getByText('Bob')).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe('Room page', () => {
     const user = userEvent.setup();
     seedRoom();
     renderApp(`/rooms/${ROOM_ID}`);
-    await user.click(screen.getByRole('button', { name: 'Follower' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Follower' }));
     await user.type(screen.getByPlaceholderText(/person's name/i), 'Charlie');
     await user.click(screen.getByRole('button', { name: 'Add' }));
     expect(screen.getAllByText('Charlie')).toHaveLength(2);
@@ -201,9 +201,17 @@ describe('Room page', () => {
     const user = userEvent.setup();
     seedRoom();
     renderApp(`/rooms/${ROOM_ID}`);
-    const leaderBtn = screen.getByRole('button', { name: 'Leader' });
-    await user.click(leaderBtn);
-    expect(leaderBtn).toHaveAttribute('aria-pressed', 'true');
+    const leader = screen.getByRole('checkbox', { name: 'Leader' });
+    const follower = screen.getByRole('checkbox', { name: 'Follower' });
+    expect(screen.getByRole('group', { name: 'Roles' })).toBeInTheDocument();
+    expect(leader).toBeChecked();
+    expect(leader).toBeDisabled();
+    await user.click(follower);
+    expect(leader).toBeEnabled();
+    await user.click(leader);
+    expect(leader).not.toBeChecked();
+    expect(follower).toBeChecked();
+    expect(follower).toBeDisabled();
   });
 
   it('migrates people stored with a single role field', async () => {

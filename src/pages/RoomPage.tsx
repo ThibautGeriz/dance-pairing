@@ -81,19 +81,28 @@ export default function RoomPage() {
             placeholder="Person's name…"
             aria-label="Person's name"
           />
-          <div className={styles.roleToggles} role="group" aria-label="Roles">
-            {ROLES.map((role) => (
-              <button
-                key={role}
-                type="button"
-                className={`${styles.roleToggle} ${role === 'leader' ? styles.roleToggleLeader : styles.roleToggleFollower}`}
-                aria-pressed={newRoles.includes(role)}
-                onClick={() => toggleRole(role)}
-              >
-                {role === 'leader' ? 'Leader' : 'Follower'}
-              </button>
-            ))}
-          </div>
+          <fieldset className={styles.roleToggles}>
+            <legend className={styles.visuallyHidden}>Roles</legend>
+            {ROLES.map((role) => {
+              const checked = newRoles.includes(role);
+              return (
+                <label
+                  key={role}
+                  className={`${styles.roleToggle} ${role === 'leader' ? styles.roleToggleLeader : styles.roleToggleFollower}`}
+                >
+                  <input
+                    type="checkbox"
+                    className={styles.roleCheckbox}
+                    checked={checked}
+                    // The last selected role cannot be removed
+                    disabled={checked && newRoles.length === 1}
+                    onChange={() => toggleRole(role)}
+                  />
+                  {role === 'leader' ? 'Leader' : 'Follower'}
+                </label>
+              );
+            })}
+          </fieldset>
           <select
             className={styles.select}
             value={newLevel}
