@@ -12,8 +12,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  checks:
+    name: ${{ matrix.script }}
     runs-on: ubuntu-latest
+    strategy:
+      # Report every failing check, not just the first one
+      fail-fast: false
+      matrix:
+        script: [typecheck, lint, format:check, test:coverage]
     steps:
       - uses: actions/checkout@v4
 
@@ -24,10 +30,12 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run typecheck
+      - run: npm run ${{ matrix.script }}
 
-      - run: npm run lint
-
-      - run: npm run format:check
-
-      - run: npm run test:coverage
+  # Single required status check for branch protection on main
+  check:
+    needs: checks
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.checks.result }}" = success
