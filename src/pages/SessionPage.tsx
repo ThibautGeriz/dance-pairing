@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useRooms } from '../states/useRooms';
 import { useSettings } from '../states/useSettings';
-import { generateRounds } from '../utils/pairing';
-import { canLead, canFollow, hasValidPair } from '../utils/roles';
+import { generateOpenRounds, generateRounds } from '../utils/pairing';
+import { canLead, canFollow, hasValidOpenPair, hasValidPair } from '../utils/roles';
 import type { Person, PersonId } from '../types';
 import styles from './SessionPage.module.css';
 
@@ -19,6 +19,7 @@ export default function SessionPage() {
     () => new Set(room?.people.map((p) => p.id) ?? []),
   );
   const [pairByLevel, setPairByLevel] = useState(false);
+  const [ignoreRoles, setIgnoreRoles] = useState(false);
   const [iterations, setIterations] = useState(1);
 
   if (!room) {
@@ -35,7 +36,9 @@ export default function SessionPage() {
   const presentPeople = room.people.filter((p) => presentIds.has(p.id));
   const presentLeaders = presentPeople.filter(canLead);
   const presentFollowers = presentPeople.filter(canFollow);
-  const canGenerate = hasValidPair(presentLeaders, presentFollowers, room.forbiddenPairs);
+  const canGenerate = ignoreRoles
+    ? hasValidOpenPair(presentPeople, room.forbiddenPairs)
+    : hasValidPair(presentLeaders, presentFollowers, room.forbiddenPairs);
 
   const togglePerson = (person: Person) => {
     setPresentIds((prev) => {
@@ -47,15 +50,23 @@ export default function SessionPage() {
   };
 
   const startPairing = () => {
-    const rounds = generateRounds(
-      presentLeaders,
-      presentFollowers,
-      iterations,
-      pairByLevel,
-      settings.levels,
-      room.forbiddenPairs,
-    );
-    const sessionId = addSession(roomId!, rounds, pairByLevel);
+    const rounds = ignoreRoles
+      ? generateOpenRounds(
+          presentPeople,
+          iterations,
+          pairByLevel,
+          settings.levels,
+          room.forbiddenPairs,
+        )
+      : generateRounds(
+          presentLeaders,
+          presentFollowers,
+          iterations,
+          pairByLevel,
+          settings.levels,
+          room.forbiddenPairs,
+        );
+    const sessionId = addSession(roomId!, rounds, pairByLevel, ignoreRoles);
     navigate(`/rooms/${roomId}/sessions/${sessionId}`);
   };
 
@@ -120,6 +131,16 @@ export default function SessionPage() {
           </label>
 
           <label className={styles.optionLabel}>
+            <span>Switch (no roles)</span>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={ignoreRoles}
+              onChange={(e) => setIgnoreRoles(e.target.checked)}
+            />
+          </label>
+
+          <label className={styles.optionLabel}>
             <span>Rounds</span>
             <input
               type="number"
@@ -133,13 +154,23 @@ export default function SessionPage() {
         </div>
 
         <p className={styles.summary}>
-          {presentLeaders.length} leader{presentLeaders.length !== 1 ? 's' : ''},&nbsp;
-          {presentFollowers.length} follower{presentFollowers.length !== 1 ? 's' : ''}
+          {ignoreRoles ? (
+            <>
+              {presentPeople.length} dancer{presentPeople.length !== 1 ? 's' : ''}
+            </>
+          ) : (
+            <>
+              {presentLeaders.length} leader{presentLeaders.length !== 1 ? 's' : ''},&nbsp;
+              {presentFollowers.length} follower{presentFollowers.length !== 1 ? 's' : ''}
+            </>
+          )}
         </p>
 
         {!canGenerate && presentPeople.length > 0 && (
           <p className={styles.warning}>
-            Need at least one leader and one follower who can dance together.
+            {ignoreRoles
+              ? 'Need at least two dancers who can dance together.'
+              : 'Need at least one leader and one follower who can dance together.'}
           </p>
         )}
       </main>
